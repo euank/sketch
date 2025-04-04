@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"os/exec"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"strings"
 
 	"github.com/richardlehane/crock32"
@@ -45,7 +47,7 @@ func run() error {
 	maxIterations := flag.Uint64("max-iterations", 0, "maximum number of iterations the agent should perform per turn, 0 to disable limit")
 	maxWallTime := flag.Duration("max-wall-time", 0, "maximum time the agent should run per turn, 0 to disable limit")
 	maxDollars := flag.Float64("max-dollars", 5.0, "maximum dollars the agent should spend per turn, 0 to disable limit")
-	one := flag.Bool("one", false, "run a single iteration and exit without termui")
+	script := flag.Bool("script", false, "run a single iteration and output JSON suitable for scripting")
 	sessionID := flag.String("session-id", newSessionID(), "unique session-id for a sketch process")
 	gitUsername := flag.String("git-username", "", "username for git commits")
 	gitEmail := flag.String("git-email", "", "email for git commits")
@@ -74,7 +76,7 @@ func run() error {
 	var slogHandler slog.Handler
 	var err error
 	var logFile *os.File
-	if !*one {
+	if !*script {
 		// Log to a file
 		logFile, err = os.CreateTemp("", "sketch-cli-log-*")
 		if err != nil {
@@ -85,10 +87,9 @@ func run() error {
 		slogHandler = slog.NewJSONHandler(logFile, &slog.HandlerOptions{Level: slog.LevelDebug})
 		slogHandler = skribe.AttrsWrap(slogHandler)
 	} else {
-		// Log straight to stdout, no task_id
-		// TODO: verbosity controls?
-		slogHandler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
-		// TODO: we skipped "AttrsWrap" here because it adds a bunch of line noise. do we want it anyway?
+		// In script mode, we don't want any logging output to interfere with JSON
+		// Use DiscardHandler to completely discard all logs
+		slogHandler = slog.DiscardHandler
 	}
 	slog.SetDefault(slog.New(slogHandler))
 
@@ -123,8 +124,8 @@ func run() error {
 		}
 	}
 
-	if *one && len(firstMessage) == 0 {
-		return fmt.Errorf("-one flag requires a message to send to the agent")
+	if *script && len(firstMessage) == 0 {
+		return fmt.Errorf("-script flag requires a message to send to the agent")
 	}
 
 	var pubKey, antURL, apiKey string
@@ -311,14 +312,39 @@ func run() error {
 		go skabandclient.DialAndServeLoop(ctx, *skabandAddr, *sessionID, pubKey, srv, connectFn)
 	}
 
-	if *one {
+	if *script {
+		var branchesCreated []string
+		var commits []*loop.GitCommit
+
 		for {
 			m := agent.WaitForMessage(ctx)
-			if m.Content != "" {
-				fmt.Printf("💬 %s %s: %s\n", m.Timestamp.Format("15:04:05"), m.Type, m.Content)
+
+			// Track any branches that were created
+			if m.Commits != nil {
+				for _, commit := range m.Commits {
+					if commit.PushedBranch != "" && !slices.Contains(branchesCreated, commit.PushedBranch) {
+						branchesCreated = append(branchesCreated, commit.PushedBranch)
+					}
+					commits = append(commits, commit)
+				}
 			}
+
 			if m.EndOfTurn && m.ParentConversationID == nil {
-				fmt.Printf("Total cost: $%0.2f\n", agent.TotalUsage().TotalCostUSD)
+				// Create the JSON output with all relevant information
+				result := map[string]any{
+					"budget":           agent.TotalUsage(),
+					"initial_commit":   agent.InitialCommit(),
+					"branches_created": branchesCreated,
+					"commits":          commits,
+					"session_id":       *sessionID,
+				}
+
+				jsonOutput, err := json.MarshalIndent(result, "", "  ")
+				if err != nil {
+					return fmt.Errorf("failed to marshal JSON output: %v", err)
+				}
+
+				fmt.Println(string(jsonOutput))
 				return nil
 			}
 		}
