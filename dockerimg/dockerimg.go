@@ -415,7 +415,14 @@ func buildLinuxSketchBin(ctx context.Context, path string) (string, error) {
 		slog.DebugContext(ctx, "go", slog.Duration("elapsed", time.Now().Sub(start)), slog.String("path", cmd.Path), slog.String("args", fmt.Sprintf("%v", skribe.Redact(cmd.Args))))
 	}
 
+	fmt.Printf("linuxGopath %s\n", linuxGopath)
+
 	src := filepath.Join(linuxGopath, "bin", "linux_"+runtime.GOARCH, "sketch")
+	if runtime.GOOS == "linux" {
+		// If we're not cross-compiling, we don't get an intermediate os_arch directory
+		src = filepath.Join(linuxGopath, "bin", "sketch")
+	}
+	  
 	dst := filepath.Join(path, "tmp-sketch-binary-linux")
 	if err := os.Rename(src, dst); err != nil {
 		return "", err
