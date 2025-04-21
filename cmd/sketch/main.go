@@ -190,6 +190,14 @@ func run() error {
 			SketchPubKey:      pubKey,
 			ForceRebuild:      false,
 		}
+		if runtime.GOOS == "linux" && config.SketchBinaryLinux == "" {
+			s, err := os.Readlink("/proc/self/exe")
+			if err != nil {
+				config.SketchBinaryLinux = s
+			} else {
+				return err
+			}
+		}
 		if err := dockerimg.LaunchContainer(ctx, stdout, stderr, config); err != nil {
 			if *verbose {
 				fmt.Fprintf(os.Stderr, "dockerimg.LaunchContainer failed: %v\ndockerimg.LaunchContainer stderr:\n%s\ndockerimg.LaunchContainer stdout:\n%s\n", err, errbuf.String(), outbuf.String())
