@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"sketch.dev/loop/server"
 	"sketch.dev/loop/webui"
 	"sketch.dev/skribe"
 )
@@ -67,6 +68,15 @@ type ContainerConfig struct {
 
 	// Sketch client public key.
 	SketchPubKey string
+
+	// Host port for the container's ssh server
+	SSHPort int
+
+	// Public keys authorized to connect to the container's ssh server
+	SSHAuthorizedKeys []byte
+
+	// Private key used to identify the container's ssh server
+	SSHServerIdentity []byte
 
 	// Host information to pass to the container
 	HostHostname   string
@@ -251,7 +261,7 @@ func LaunchContainer(ctx context.Context, stdout, stderr io.Writer, config Conta
 		// the scrollback (which is not good, but also not fatal).  I can't see why it does this
 		// though, since none of the calls in postContainerInitConfig obviously write to stdout
 		// or stderr.
-		if err := postContainerInitConfig(ctx, localAddr, commit, gitSrv.gitPort, gitSrv.pass); err != nil {
+		if err := postContainerInitConfig(ctx, localAddr, commit, gitSrv.gitPort, gitSrv.pass, config.SSHServerIdentity, config.SSHAuthorizedKeys); err != nil {
 			slog.ErrorContext(ctx, "LaunchContainer.postContainerInitConfig", slog.String("err", err.Error()))
 			errCh <- appendInternalErr(err)
 		}
@@ -368,6 +378,9 @@ func createDockerContainer(ctx context.Context, cntrName, hostPort, relPath, img
 	if config.SketchPubKey != "" {
 		cmdArgs = append(cmdArgs, "-e", "SKETCH_PUB_KEY="+config.SketchPubKey)
 	}
+	if config.SSHPort != 0 {
+		cmdArgs = append(cmdArgs, "-p", fmt.Sprintf("%d:2022", config.SSHPort)) // forward container ssh port to host ssh port
+	}
 	if relPath != "." {
 		cmdArgs = append(cmdArgs, "-w", "/app/"+relPath)
 	}
@@ -471,13 +484,17 @@ func getContainerPort(ctx context.Context, cntrName string) (string, error) {
 }
 
 // Contact the container and configure it.
-func postContainerInitConfig(ctx context.Context, localAddr, commit, gitPort, gitPass string) error {
+func postContainerInitConfig(ctx context.Context, localAddr, commit, gitPort, gitPass string, sshServerIdentity, sshAuthorizedKeys []byte) error {
 	localURL := "http://" + localAddr
-	initMsg, err := json.Marshal(map[string]string{
-		"commit":          commit,
-		"git_remote_addr": fmt.Sprintf("http://sketch:%s@host.docker.internal:%s/.git", gitPass, gitPort),
-		"host_addr":       localAddr,
-	})
+
+	initMsg, err := json.Marshal(
+		server.InitRequest{
+			Commit:            commit,
+			GitRemoteAddr:     fmt.Sprintf("http://sketch:%s@host.docker.internal:%s/.git", gitPass, gitPort),
+			HostAddr:          localAddr,
+			SSHAuthorizedKeys: sshAuthorizedKeys,
+			SSHServerIdentity: sshServerIdentity,
+		})
 	if err != nil {
 		return fmt.Errorf("init msg: %w", err)
 	}

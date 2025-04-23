@@ -2,6 +2,7 @@
 package server
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -64,6 +65,14 @@ type State struct {
 	RuntimeOS         string `json:"runtime_os,omitempty"`
 	HostWorkingDir    string `json:"host_working_dir,omitempty"`
 	RuntimeWorkingDir string `json:"runtime_working_dir,omitempty"`
+}
+
+type InitRequest struct {
+	HostAddr          string `json:"host_addr"`
+	GitRemoteAddr     string `json:"git_remote_addr"`
+	Commit            string `json:"commit"`
+	SSHAuthorizedKeys []byte `json:"ssh_authorized_keys"`
+	SSHServerIdentity []byte `json:"ssh_server_identity"`
 }
 
 // Server serves sketch HTTP. Server implements http.Handler.
@@ -146,20 +155,29 @@ func New(agent loop.CodingAgent, logFile *os.File) (*Server, error) {
 			http.Error(w, "failed to read request body: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		m := make(map[string]string)
-		if err := json.Unmarshal(body, &m); err != nil {
+
+		m := &InitRequest{}
+		if err := json.Unmarshal(body, m); err != nil {
 			http.Error(w, "bad request body: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		hostAddr := m["host_addr"]
-		gitRemoteAddr := m["git_remote_addr"]
-		commit := m["commit"]
+
+		// Start the SSH server if the init request included ssh keys.
+		if len(m.SSHAuthorizedKeys) > 0 && len(m.SSHServerIdentity) > 0 {
+			go func() {
+				ctx := context.Background()
+				if err := s.ServeSSH(ctx, m.SSHServerIdentity, m.SSHAuthorizedKeys); err != nil {
+					slog.ErrorContext(r.Context(), "/init ServeSSH", slog.String("err", err.Error()))
+				}
+			}()
+		}
+
 		ini := loop.AgentInit{
 			WorkingDir:    "/app",
 			InDocker:      true,
-			Commit:        commit,
-			GitRemoteAddr: gitRemoteAddr,
-			HostAddr:      hostAddr,
+			Commit:        m.Commit,
+			GitRemoteAddr: m.GitRemoteAddr,
+			HostAddr:      m.HostAddr,
 		}
 		if err := agent.Init(ini); err != nil {
 			http.Error(w, "init failed: "+err.Error(), http.StatusInternalServerError)

@@ -48,6 +48,9 @@ func run() error {
 	verbose := flag.Bool("verbose", false, "enable verbose output")
 	version := flag.Bool("version", false, "print the version and exit")
 	workingDir := flag.String("C", "", "when set, change to this directory before running")
+	sshServerIdentity := flag.String("ssh_server_identity", "", "location of the file containing the private key that the container's ssh server will use to identify itself")
+	sshAuthorizedKeys := flag.String("ssh_authorized_keys", "", "location of the file containing the public keys that the container's ssh server will authorize")
+	sshPort := flag.Int("ssh_port", 2022, "the host port number that the container's ssh server will listen on")
 
 	// Flags geared towards sketch developers or sketch internals:
 	gitUsername := flag.String("git-username", "", "(internal) username for git commits")
@@ -179,6 +182,21 @@ func run() error {
 			outbuf, errbuf = &bytes.Buffer{}, &bytes.Buffer{}
 			stdout, stderr = outbuf, errbuf
 		}
+
+		var authorizedKeys, serverIdentity []byte
+		if *sshAuthorizedKeys != "" {
+			authorizedKeys, err = os.ReadFile(*sshAuthorizedKeys)
+			if err != nil {
+				return fmt.Errorf("reading ssh_authorized_keys from %s: %w", *sshAuthorizedKeys, err)
+			}
+		}
+		if *sshServerIdentity != "" {
+			serverIdentity, err = os.ReadFile(*sshServerIdentity)
+			if err != nil {
+				return fmt.Errorf("reading ssh_id_rsa from %s: %w", *sshServerIdentity, err)
+			}
+		}
+
 		fmt.Printf("launching container...\n")
 		config := dockerimg.ContainerConfig{
 			SessionID:         *sessionID,
@@ -194,6 +212,9 @@ func run() error {
 			ContainerLogDest:  *containerLogDest,
 			SketchBinaryLinux: *sketchBinaryLinux,
 			SketchPubKey:      pubKey,
+			SSHServerIdentity: serverIdentity,
+			SSHAuthorizedKeys: authorizedKeys,
+			SSHPort:           *sshPort,
 			ForceRebuild:      false,
 			HostHostname:      getHostname(),
 			HostOS:            runtime.GOOS,
