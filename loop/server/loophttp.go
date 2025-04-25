@@ -65,6 +65,9 @@ type State struct {
 	InsideOS          string `json:"inside_os,omitempty"`
 	OutsideWorkingDir string `json:"outside_working_dir,omitempty"`
 	InsideWorkingDir  string `json:"inside_working_dir,omitempty"`
+
+	// Proxy services configuration
+	Proxies []loop.ProxyConfig `json:"proxies,omitempty"`
 }
 
 type InitRequest struct {
@@ -87,6 +90,20 @@ type Server struct {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Check if this is a proxy request
+	if strings.HasPrefix(r.URL.Path, "/proxy/") {
+		parts := strings.SplitN(strings.TrimPrefix(r.URL.Path, "/proxy/"), "/", 2)
+		if len(parts) > 0 {
+			proxyName := parts[0]
+			err := s.agent.HandleProxyRequest(w, r, proxyName)
+			if err != nil {
+				slog.Error("Proxy request handling failed", "name", proxyName, "error", err)
+			}
+			return
+		}
+	}
+
+	// Handle all other requests through the standard mux
 	s.mux.ServeHTTP(w, r)
 }
 
@@ -363,6 +380,7 @@ func New(agent loop.CodingAgent, logFile *os.File) (*Server, error) {
 			OutsideWorkingDir: agent.OutsideWorkingDir(),
 			InsideWorkingDir:  getWorkingDir(),
 			GitOrigin:         agent.GitOrigin(),
+			Proxies:           agent.GetProxies(),
 		}
 
 		// Create a JSON encoder with indentation for pretty-printing

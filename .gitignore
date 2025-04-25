@@ -1,2 +1,6 @@
 node_modules
 
+# Test coverage files
+coverage.html
+coverage.out
+

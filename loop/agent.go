@@ -22,6 +22,13 @@ const (
 	userCancelMessage = "user requested agent to stop handling responses"
 )
 
+// ProxyConfig represents a configured HTTP proxy for a service
+type ProxyConfig struct {
+	Name string `json:"name"`
+	Port int    `json:"port"`
+	Path string `json:"path"` // The proxy path, e.g., /proxy/{name}
+}
+
 type CodingAgent interface {
 	// Init initializes an agent inside a docker container.
 	Init(AgentInit) error
@@ -77,6 +84,12 @@ type CodingAgent interface {
 	OutsideHostname() string
 	OutsideWorkingDir() string
 	GitOrigin() string
+
+	// HandleProxyRequest handles an HTTP proxy request for a given name
+	HandleProxyRequest(w http.ResponseWriter, r *http.Request, name string) error
+
+	// GetProxies returns all configured proxy services
+	GetProxies() []ProxyConfig
 }
 
 type CodingAgentMessageType string
@@ -248,6 +261,11 @@ type Agent struct {
 
 	// Time when the current turn started (reset at the beginning of InnerLoop)
 	startOfTurn time.Time
+
+	// Proxied services configuration
+	proxies     map[string]*proxy
+	proxiesMu   sync.Mutex
+	proxyLogDir string
 
 	// Inbox - for messages from the user to the agent.
 	// sent on by UserMessage
@@ -461,6 +479,8 @@ func NewAgent(config AgentConfig) *Agent {
 		outsideHostname:   config.OutsideHostname,
 		outsideOS:         config.OutsideOS,
 		outsideWorkingDir: config.OutsideWorkingDir,
+		proxies:     make(map[string]*proxy),
+		proxyLogDir: os.TempDir(),
 	}
 	return agent
 }
@@ -606,7 +626,7 @@ for, including creating a git commit. Do not forget to run tests.
 	convo.Tools = []*ant.Tool{
 		claudetool.Bash, claudetool.Keyword,
 		claudetool.Think, a.titleTool(), makeDoneTool(a.codereview, a.config.GitUsername, a.config.GitEmail),
-		a.codereview.Tool(),
+		a.codereview.Tool(), MakeHttpProxyTool(a, a.proxyLogDir),
 	}
 	if a.config.UseAnthropicEdit {
 		convo.Tools = append(convo.Tools, claudetool.AnthropicEditTool)
