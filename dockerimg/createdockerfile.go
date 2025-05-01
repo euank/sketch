@@ -57,11 +57,12 @@ RUN printf '%s\n' \
       'path-exclude=/usr/share/zoneinfo/*' \
     > /etc/dpkg/dpkg.cfg.d/01_nodoc
 
-RUN --mount=type=cache,target=/var/cache/apt \
-	set -eux; \
+RUN set -eux; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
-		git jq sqlite3 npm nodejs gh ripgrep fzf python3 curl vim
+		git jq sqlite3 npm nodejs gh ripgrep fzf python3 curl vim && \
+	apt-get clean && \
+	rm -rf /var/lib/apt/lists/*
 
 # Strip out docs from debian.
 RUN rm -rf /usr/share/{doc,doc-base,info,lintian,man,groff,locale,zoneinfo}/*
@@ -72,13 +73,11 @@ ENV PATH="$GOPATH/bin:$PATH"
 # the specific versions are rarely what a user wants so there is no
 # point polluting the base image module with them.
 
-RUN --mount=type=cache,target=/go/pkg/mod \
-	--mount=type=cache,target=/root/.cache/go-build \
-	set -eux; \
+RUN set -eux; \
 	go install golang.org/x/tools/cmd/goimports@latest; \
 	go install golang.org/x/tools/gopls@latest; \
 	go install mvdan.cc/gofumpt@latest; \
-	go clean -cache -testcache
+	go clean -cache -testcache -modcache
 
 ENV GOTOOLCHAIN=auto
 ENV SKETCH=1
