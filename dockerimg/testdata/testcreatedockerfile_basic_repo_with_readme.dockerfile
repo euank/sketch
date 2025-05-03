@@ -1,4 +1,4 @@
-FROM ghcr.io/boldsoftware/sketch:f5b4ebd9ca15d3dbd2cd08e6e7ab9548
+FROM ghcr.io/boldsoftware/sketch:99a2e4afe316b3c6cf138830dbfb7796
 
 ARG GIT_USER_EMAIL
 ARG GIT_USER_NAME
@@ -7,7 +7,7 @@ RUN git config --global user.email "$GIT_USER_EMAIL" && \
     git config --global user.name "$GIT_USER_NAME" && \
     git config --global http.postBuffer 524288000
 
-LABEL sketch_context="3226456072fc35733ff1b5e0f1a4dfc06bceafcf8824dbbb80face06aa167285"
+LABEL sketch_context="45ae7c2a65560701f1da47223747d1e8d9e62d75b5fc28b51d3a5f6afb0daa3e"
 COPY . /app
 RUN rm -f /app/tmp-sketch-dockerfile
 
@@ -17,8 +17,8 @@ RUN if [ -f go.mod ]; then go mod download; fi
 # Switch to lenient shell so we are more likely to get past failing extra_cmds.
 SHELL ["/bin/bash", "-uo", "pipefail", "-c"]
 
-# No additional commands needed for this simple Go test project
-# The base Dockerfile already includes all necessary Go development tools
+# No special commands needed for this simple Go test project
+# The base image already provides all necessary Go tools
 
 # Switch back to strict shell after extra_cmds.
 SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]

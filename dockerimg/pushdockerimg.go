@@ -25,7 +25,8 @@ func main() {
 	sudo apt-get update
 	sudo apt-get install docker.io docker-buildx qemu-user-static
 	# Login to Docker with GitHub credentials
-	# You can get #GH_ACCESS_TOK from github.com or from 'gh auth token'.
+	# You can get $GH_ACCESS_TOK from github.com or from 'gh auth token'.
+	# On github.com, User icon in top right...Settings...Developer Settings.
 	# Make sure the token is configured to write containers for the boldsoftware org.
 	echo $GH_ACCESS_TOK | docker login ghcr.io -u $GH_USER --password-stdin
 
