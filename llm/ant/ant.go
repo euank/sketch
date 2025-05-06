@@ -43,6 +43,18 @@ type Service struct {
 
 var _ llm.Service = (*Service)(nil)
 
+type toolContentImageSource struct {
+	Type      string `json:"type,omitempty"`       // "base64"
+	MediaType string `json:"media_type,omitempty"` // "image/jpeg"
+	Data      string `json:"data,omitempty"`       // base64 encoded image data
+}
+
+type toolContent struct {
+	Type   string                 `json:"type,omitempty"`
+	Text   string                 `json:"text,omitempty"`
+	Source toolContentImageSource `json:"source,omitempty"`
+}
+
 type content struct {
 	// TODO: image support?
 	// https://docs.anthropic.com/en/api/messages
@@ -62,7 +74,7 @@ type content struct {
 	// for tool_result
 	ToolUseID  string `json:"tool_use_id,omitempty"`
 	ToolError  bool   `json:"is_error,omitempty"`
-	ToolResult string `json:"content,omitempty"`
+	ToolResult []toolContent `json:"content,omitempty"`
 
 	// timing information for tool_result; not sent to Claude
 	StartTime *time.Time `json:"-"`

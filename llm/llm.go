@@ -75,7 +75,7 @@ type Tool struct {
 	// The outputs from Run will be sent back to Claude.
 	// If you do not want to respond to the tool call request from Claude, return ErrDoNotRespond.
 	// ctx contains extra (rarely used) tool call information; retrieve it with ToolCallInfoFromContext.
-	Run func(ctx context.Context, input json.RawMessage) (string, error) `json:"-"`
+	Run func(ctx context.Context, input json.RawMessage) ([]Content, error) `json:"-"`
 }
 
 type Content struct {
