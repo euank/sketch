@@ -44,12 +44,12 @@ type Service struct {
 var _ llm.Service = (*Service)(nil)
 
 type content struct {
-	// TODO: image support?
 	// https://docs.anthropic.com/en/api/messages
-	ID        string `json:"id,omitempty"`
-	Type      string `json:"type,omitempty"`
-	Text      string `json:"text,omitempty"`
-	MediaType string `json:"media_type,omitempty"` // for image
+	ID        string          `json:"id,omitempty"`
+	Type      string          `json:"type,omitempty"`
+	Text      string          `json:"text,omitempty"`
+	MediaType string          `json:"media_type,omitempty"` // for image
+	Source    json.RawMessage `json:"source,omitempty"`     // for image
 
 	// for thinking
 	Thinking  string `json:"thinking,omitempty"`
@@ -222,7 +222,17 @@ func fromLLMContent(c llm.Content) content {
 	if len(c.ToolResult) > 0 {
 		toolResult = make([]content, len(c.ToolResult))
 		for i, tr := range c.ToolResult {
-			toolResult[i] = fromLLMContent(tr)
+			// For image content inside a tool_result, we need to map it to "image" type
+			if tr.MediaType != "" && tr.MediaType == "image/jpeg" || tr.MediaType == "image/png" {
+				// Format as an image for Claude
+				toolResult[i] = content{
+					Type: "image",
+					Source: json.RawMessage(fmt.Sprintf(`{"type":"base64","media_type":"%s","data":"%s"}`,
+						tr.MediaType, tr.Data)),
+				}
+			} else {
+				toolResult[i] = fromLLMContent(tr)
+			}
 		}
 	}
 
