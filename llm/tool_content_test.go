@@ -19,8 +19,6 @@ func TestToolResultArray(t *testing.T) {
 	}
 
 	toolResult := Content{
-		Type:       ContentTypeToolResult,
-		ToolUseID:  "toolu_01A09q90qw90lq917835lq9",
 		ToolResult: []Content{textContent, imageContent},
 	}
 

@@ -59,7 +59,7 @@ func TestAnthropicImageToolResult(t *testing.T) {
 	}
 
 	// Check that the image source contains the expected format
-	var source map[string]interface{}
+	var source map[string]any
 	if err := json.Unmarshal(anthropicContent.ToolResult[1].Source, &source); err != nil {
 		t.Errorf("Failed to unmarshal image source: %v", err)
 	}
