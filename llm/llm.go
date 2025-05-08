@@ -83,9 +83,12 @@ type Content struct {
 	Type ContentType
 	Text string
 
+	// Media type for image content
+	MediaType string
+
 	// for thinking
 	Thinking  string
-	Data      string
+	Data      string // Used for both thinking/redacted_thinking and base64 image data
 	Signature string
 
 	// for tool_use
