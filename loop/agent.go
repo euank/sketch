@@ -136,12 +136,12 @@ type AgentMessage struct {
 	// EndOfTurn indicates that the AI is done working and is ready for the next user input.
 	EndOfTurn bool `json:"end_of_turn"`
 
-	Content    string `json:"content"`
-	ToolName   string `json:"tool_name,omitempty"`
-	ToolInput  string `json:"input,omitempty"`
-	ToolResult string `json:"tool_result,omitempty"`
-	ToolError  bool   `json:"tool_error,omitempty"`
-	ToolCallId string `json:"tool_call_id,omitempty"`
+	Content    string        `json:"content"`
+	ToolName   string        `json:"tool_name,omitempty"`
+	ToolInput  string        `json:"input,omitempty"`
+	ToolResult []llm.Content `json:"tool_result,omitempty"`
+	ToolError  bool          `json:"tool_error,omitempty"`
+	ToolCallId string        `json:"tool_call_id,omitempty"`
 
 	// ToolCalls is a list of all tool calls requested in this message (name and input pairs)
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
@@ -222,8 +222,8 @@ func (a *AgentMessage) Attr() slog.Attr {
 	if a.TurnDuration != nil {
 		attrs = append(attrs, slog.Int64("turnDuration", a.TurnDuration.Nanoseconds()))
 	}
-	if a.ToolResult != "" {
-		attrs = append(attrs, slog.String("tool_result", a.ToolResult))
+	if len(a.ToolResult) > 0 {
+		attrs = append(attrs, slog.Any("tool_result", a.ToolResult))
 	}
 	if a.ToolError {
 		attrs = append(attrs, slog.Bool("tool_error", a.ToolError))

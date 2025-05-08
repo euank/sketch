@@ -218,9 +218,12 @@ func fromLLMCache(c bool) json.RawMessage {
 }
 
 func fromLLMContent(c llm.Content) content {
-	toolResult := make([]content, len(c.ToolResult))
-	for i, tr := range c.ToolResult {
-		toolResult[i] = fromLLMContent(tr)
+	var toolResult []content
+	if len(c.ToolResult) > 0 {
+		toolResult = make([]content, len(c.ToolResult))
+		for i, tr := range c.ToolResult {
+			toolResult[i] = fromLLMContent(tr)
+		}
 	}
 
 	return content{
@@ -306,6 +309,15 @@ func toLLMUsage(u usage) llm.Usage {
 }
 
 func toLLMContent(c content) llm.Content {
+	// Convert toolResult from []content to []llm.Content
+	var toolResultContents []llm.Content
+	if len(c.ToolResult) > 0 {
+		toolResultContents = make([]llm.Content, len(c.ToolResult))
+		for i, tr := range c.ToolResult {
+			toolResultContents[i] = toLLMContent(tr)
+		}
+	}
+
 	return llm.Content{
 		ID:         c.ID,
 		Type:       toLLMContentType[c.Type],
@@ -317,7 +329,7 @@ func toLLMContent(c content) llm.Content {
 		ToolInput:  c.ToolInput,
 		ToolUseID:  c.ToolUseID,
 		ToolError:  c.ToolError,
-		ToolResult: c.ToolResult,
+		ToolResult: toolResultContents,
 	}
 }
 

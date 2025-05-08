@@ -121,7 +121,7 @@ func ContentsAttr(contents []Content) slog.Attr {
 			attrs = append(attrs, slog.String("tool_name", content.ToolName))
 			attrs = append(attrs, slog.String("tool_input", string(content.ToolInput)))
 		case ContentTypeToolResult:
-			attrs = append(attrs, slog.String("tool_result", content.ToolResult))
+			attrs = append(attrs, slog.Any("tool_result", content.ToolResult))
 			attrs = append(attrs, slog.Bool("tool_error", content.ToolError))
 		case ContentTypeThinking:
 			attrs = append(attrs, slog.String("thinking", content.Text))
