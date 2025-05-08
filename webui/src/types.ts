@@ -31,7 +31,7 @@ export interface AgentMessage {
 	content: string;
 	tool_name?: string;
 	input?: string;
-	tool_result?: string;
+	tool_result?: string | any[];
 	tool_error?: boolean;
 	tool_call_id?: string;
 	tool_calls?: ToolCall[] | null;

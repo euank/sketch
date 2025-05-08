@@ -337,7 +337,9 @@ export class SketchToolCardBash extends LitElement {
         ? html`<div slot="result" class="result">
             <div class="tool-call-result-container">
               <pre class="tool-call-result">
-${this.toolCall?.result_message.tool_result}</pre
+${Array.isArray(this.toolCall?.result_message.tool_result) 
+  ? JSON.stringify(this.toolCall?.result_message.tool_result, null, 2) 
+  : this.toolCall?.result_message.tool_result}</pre
               >
             </div>
           </div>`
@@ -364,7 +366,9 @@ export class SketchToolCardCodeReview extends LitElement {
   }
 
   render() {
-    const resultText = this.toolCall?.result_message?.tool_result || "";
+    const resultText = Array.isArray(this.toolCall?.result_message?.tool_result)
+      ? JSON.stringify(this.toolCall?.result_message?.tool_result, null, 2)
+      : this.toolCall?.result_message?.tool_result || "";
     const statusIcon = this.getStatusIcon(resultText);
 
     return html`<sketch-tool-card .open=${this.open} .toolCall=${this.toolCall}>
@@ -431,7 +435,9 @@ export class SketchToolCardPatch extends LitElement {
         })}
       </div>
       <div slot="result">
-        <pre>${this.toolCall?.result_message?.tool_result}</pre>
+        <pre>${Array.isArray(this.toolCall?.result_message?.tool_result)
+  ? JSON.stringify(this.toolCall?.result_message?.tool_result, null, 2)
+  : this.toolCall?.result_message?.tool_result}</pre>
       </div>
     </sketch-tool-card>`;
   }
@@ -636,9 +642,11 @@ export class SketchToolCardMultipleChoice extends LitElement {
   updateSelectedOption() {
     if (this.toolCall?.result_message?.tool_result) {
       try {
-        this.selectedOption = JSON.parse(
-          this.toolCall.result_message.tool_result,
-        ).selected;
+        const resultText = Array.isArray(this.toolCall.result_message.tool_result)
+          ? JSON.stringify(this.toolCall.result_message.tool_result)
+          : this.toolCall.result_message.tool_result;
+            
+        this.selectedOption = JSON.parse(resultText).selected;
       } catch (e) {
         console.error("Error parsing result:", e);
       }
@@ -722,7 +730,9 @@ export class SketchToolCardGeneric extends LitElement {
       <div slot="result">
         Result:
         ${this.toolCall?.result_message?.tool_result
-          ? html`<pre>${this.toolCall?.result_message.tool_result}</pre>`
+          ? html`<pre>${Array.isArray(this.toolCall?.result_message?.tool_result)
+              ? JSON.stringify(this.toolCall?.result_message?.tool_result, null, 2)
+              : this.toolCall?.result_message?.tool_result}</pre>`
           : ""}
       </div>
     </sketch-tool-card>`;

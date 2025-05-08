@@ -94,7 +94,11 @@ export class SketchToolCardScreenshot extends LitElement {
     let hasResult = false;
     if (this.toolCall?.result_message?.tool_result) {
       try {
-        const result = JSON.parse(this.toolCall.result_message.tool_result);
+        const resultText = Array.isArray(this.toolCall.result_message.tool_result)
+          ? JSON.stringify(this.toolCall.result_message.tool_result)
+          : this.toolCall.result_message.tool_result;
+            
+        const result = JSON.parse(resultText);
         screenshotId = result.id;
         hasResult = true;
       } catch (e) {

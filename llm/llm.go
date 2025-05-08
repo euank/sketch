@@ -79,32 +79,32 @@ type Tool struct {
 }
 
 type Content struct {
-	ID   string
-	Type ContentType
-	Text string
+	ID   string      `json:"id,omitempty"`
+	Type ContentType `json:"type,omitempty"`
+	Text string      `json:"text,omitempty"`
 
 	// Media type for image content
-	MediaType string
+	MediaType string `json:"media_type,omitempty"`
 
 	// for thinking
-	Thinking  string
-	Data      string // Used for both thinking/redacted_thinking and base64 image data
-	Signature string
+	Thinking  string `json:"thinking,omitempty"`
+	Data      string `json:"data,omitempty"` // Used for both thinking/redacted_thinking and base64 image data
+	Signature string `json:"signature,omitempty"`
 
 	// for tool_use
-	ToolName  string
-	ToolInput json.RawMessage
+	ToolName  string          `json:"tool_name,omitempty"`
+	ToolInput json.RawMessage `json:"input,omitempty"`
 
 	// for tool_result
-	ToolUseID  string
-	ToolError  bool
-	ToolResult []Content
+	ToolUseID  string    `json:"tool_use_id,omitempty"`
+	ToolError  bool      `json:"tool_error,omitempty"`
+	ToolResult []Content `json:"content,omitempty"`
 
 	// timing information for tool_result; added externally; not sent to the LLM
-	ToolUseStartTime *time.Time
-	ToolUseEndTime   *time.Time
+	ToolUseStartTime *time.Time `json:"-"`
+	ToolUseEndTime   *time.Time `json:"-"`
 
-	Cache bool
+	Cache bool `json:"cache,omitempty"`
 }
 
 func StringContent(s string) Content {
