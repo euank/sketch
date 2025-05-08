@@ -46,14 +46,13 @@ var _ llm.Service = (*Service)(nil)
 type content struct {
 	// TODO: image support?
 	// https://docs.anthropic.com/en/api/messages
-	ID        string `json:"id,omitempty"`
-	Type      string `json:"type,omitempty"`
-	Text      string `json:"text,omitempty"`
-	MediaType string `json:"media_type,omitempty"` // for image
+	ID   string `json:"id,omitempty"`
+	Type string `json:"type,omitempty"`
+	Text string `json:"text,omitempty"`
 
 	// for thinking
 	Thinking  string `json:"thinking,omitempty"`
-	Data      string `json:"data,omitempty"`      // for redacted_thinking or image
+	Data      string `json:"data,omitempty"`      // for redacted_thinking
 	Signature string `json:"signature,omitempty"` // for thinking
 
 	// for tool_use
@@ -61,9 +60,9 @@ type content struct {
 	ToolInput json.RawMessage `json:"input,omitempty"`
 
 	// for tool_result
-	ToolUseID  string    `json:"tool_use_id,omitempty"`
-	ToolError  bool      `json:"is_error,omitempty"`
-	ToolResult []content `json:"content,omitempty"`
+	ToolUseID  string `json:"tool_use_id,omitempty"`
+	ToolError  bool   `json:"is_error,omitempty"`
+	ToolResult string `json:"content,omitempty"`
 
 	// timing information for tool_result; not sent to Claude
 	StartTime *time.Time `json:"-"`
@@ -218,11 +217,6 @@ func fromLLMCache(c bool) json.RawMessage {
 }
 
 func fromLLMContent(c llm.Content) content {
-	toolResult := make([]content, len(c.ToolResult))
-	for i, tr := range c.ToolResult {
-		toolResult[i] = fromLLMContent(tr)
-	}
-
 	return content{
 		ID:           c.ID,
 		Type:         fromLLMContentType[c.Type],
@@ -234,7 +228,7 @@ func fromLLMContent(c llm.Content) content {
 		ToolInput:    c.ToolInput,
 		ToolUseID:    c.ToolUseID,
 		ToolError:    c.ToolError,
-		ToolResult:   toolResult,
+		ToolResult:   c.ToolResult,
 		CacheControl: fromLLMCache(c.Cache),
 	}
 }

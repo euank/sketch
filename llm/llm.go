@@ -95,7 +95,7 @@ type Content struct {
 	// for tool_result
 	ToolUseID  string
 	ToolError  bool
-	ToolResult []Content
+	ToolResult string
 
 	// timing information for tool_result; added externally; not sent to the LLM
 	ToolUseStartTime *time.Time
