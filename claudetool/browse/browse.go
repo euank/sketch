@@ -3,11 +3,14 @@ package browse
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -523,14 +526,17 @@ func (b *BrowseTools) screenshotRun(ctx context.Context, m json.RawMessage) (str
 		return errorResponse(fmt.Errorf("failed to save screenshot")), nil
 	}
 
-	// Return the ID in the response
-	output := screenshotOutput{ID: id}
-	response, err := json.Marshal(output)
-	if err != nil {
-		return errorResponse(fmt.Errorf("failed to marshal response: %w", err)), nil
-	}
+	// Get the full path to the screenshot
+	screenshotPath := GetScreenshotPath(id)
 
-	return string(response), nil
+	// Return the ID and instructions on how to view the screenshot
+	result := fmt.Sprintf(`{
+  "id": "%s",
+  "path": "%s",
+  "message": "Screenshot saved. To view this screenshot in the conversation, use the read_image tool with the path provided."
+}`, id, screenshotPath)
+
+	return result, nil
 }
 
 // ScrollIntoViewTool definition
@@ -604,6 +610,7 @@ func (b *BrowseTools) GetAllTools() []*llm.Tool {
 		b.NewEvalTool(),
 		b.NewScreenshotTool(),
 		b.NewScrollIntoViewTool(),
+		b.NewReadImageTool(),
 	}
 }
 
@@ -630,4 +637,76 @@ func (b *BrowseTools) SaveScreenshot(data []byte) string {
 // GetScreenshotPath returns the full path to a screenshot by ID
 func GetScreenshotPath(id string) string {
 	return filepath.Join(ScreenshotDir, id+".png")
+}
+
+// ReadImageTool definition
+type readImageInput struct {
+	Path string `json:"path"`
+}
+
+// NewReadImageTool creates a tool for reading images and returning them as base64 encoded data
+func (b *BrowseTools) NewReadImageTool() *llm.Tool {
+	return &llm.Tool{
+		Name:        "browser_read_image",
+		Description: "Read an image file (such as a screenshot) and encode it for sending to the LLM",
+		InputSchema: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"path": {
+					"type": "string",
+					"description": "Path to the image file to read"
+				}
+			},
+			"required": ["path"]
+		}`),
+		Run: b.readImageRun,
+	}
+}
+
+func (b *BrowseTools) readImageRun(ctx context.Context, m json.RawMessage) (string, error) {
+	var input readImageInput
+	if err := json.Unmarshal(m, &input); err != nil {
+		return errorResponse(fmt.Errorf("invalid input: %w", err)), nil
+	}
+
+	// Check if the path exists
+	if _, err := os.Stat(input.Path); os.IsNotExist(err) {
+		return errorResponse(fmt.Errorf("image file not found: %s", input.Path)), nil
+	}
+
+	// Read the file
+	imageData, err := os.ReadFile(input.Path)
+	if err != nil {
+		return errorResponse(fmt.Errorf("failed to read image file: %w", err)), nil
+	}
+
+	// Detect the image type
+	imageType := http.DetectContentType(imageData)
+	if !strings.HasPrefix(imageType, "image/") {
+		return errorResponse(fmt.Errorf("file is not an image: %s", imageType)), nil
+	}
+
+	// Encode the image as base64
+	base64Data := base64.StdEncoding.EncodeToString(imageData)
+
+	// Create a Content object that includes both text and the image
+	contents := []llm.Content{
+		{
+			Type: llm.ContentTypeText,
+			Text: fmt.Sprintf("Image from %s (type: %s)", input.Path, imageType),
+		},
+		{
+			Type:      llm.ContentTypeText, // Will be mapped to image in content array
+			MediaType: imageType,
+			Data:      base64Data,
+		},
+	}
+
+	// Marshal to JSON
+	jsonData, err := json.Marshal(contents)
+	if err != nil {
+		return errorResponse(fmt.Errorf("failed to marshal response: %w", err)), nil
+	}
+
+	return string(jsonData), nil
 }

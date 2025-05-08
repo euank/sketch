@@ -3,7 +3,9 @@ package browse
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -70,8 +72,8 @@ func TestGetAllTools(t *testing.T) {
 	// Get all tools
 	allTools := tools.GetAllTools()
 
-	// We should have 8 tools
-	if len(allTools) != 8 {
+	// We should have 9 tools
+	if len(allTools) != 9 {
 		t.Errorf("expected 8 tools, got %d", len(allTools))
 	}
 
@@ -238,4 +240,62 @@ func TestScreenshotTool(t *testing.T) {
 
 	// Clean up the test file
 	os.Remove(filePath)
+}
+
+func TestReadImageTool(t *testing.T) {
+	// Create a test BrowseTools instance
+	ctx := context.Background()
+	browseTools := NewBrowseTools(ctx)
+
+	// Create a test image
+	testDir := t.TempDir()
+	testImagePath := filepath.Join(testDir, "test_image.png")
+
+	// Create a small 1x1 black PNG image
+	smallPng := []byte{
+		0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+		0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x08, 0xD7, 0x63, 0x60, 0x00, 0x00, 0x00,
+		0x02, 0x00, 0x01, 0xE2, 0x21, 0xBC, 0x33, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+		0x42, 0x60, 0x82,
+	}
+
+	// Write the test image
+	err := os.WriteFile(testImagePath, smallPng, 0o644)
+	if err != nil {
+		t.Fatalf("Failed to create test image: %v", err)
+	}
+
+	// Create the tool
+	readImageTool := browseTools.NewReadImageTool()
+
+	// Prepare input
+	input := fmt.Sprintf(`{"path": "%s"}`, testImagePath)
+
+	// Run the tool
+	result, err := readImageTool.Run(ctx, json.RawMessage(input))
+	if err != nil {
+		t.Fatalf("Read image tool failed: %v", err)
+	}
+
+	// Parse the result
+	var contents []llm.Content
+	err = json.Unmarshal([]byte(result), &contents)
+	if err != nil {
+		t.Fatalf("Failed to parse result: %v\nResult was: %s", err, result)
+	}
+
+	// Check that we got at least two content objects
+	if len(contents) < 2 {
+		t.Fatalf("Expected at least 2 content objects, got %d", len(contents))
+	}
+
+	// Check that the second content has image data
+	if contents[1].MediaType == "" {
+		t.Errorf("Expected MediaType in second content")
+	}
+
+	if contents[1].Data == "" {
+		t.Errorf("Expected Data in second content")
+	}
 }
