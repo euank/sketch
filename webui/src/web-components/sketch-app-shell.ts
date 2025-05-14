@@ -9,6 +9,7 @@ import "./sketch-container-status";
 import "./sketch-diff-view";
 import { SketchDiffView } from "./sketch-diff-view";
 import "./sketch-diff2-view";
+import { DefaultGitDataService } from "./git-data-service";
 import "./sketch-diff-navigation";
 import "./sketch-monaco-view";
 import "./sketch-network-status";
@@ -27,7 +28,7 @@ type ViewMode = "chat" | "diff" | "diff2" | "terminal";
 export class SketchAppShell extends LitElement {
   // Current view mode (chat, diff, terminal)
   @state()
-  viewMode: "chat" | "diff" | "diff2" | "terminal" = "chat";
+  viewMode: ViewMode = "chat";
 
   // Current commit hash for diff view
   @state()
@@ -122,14 +123,21 @@ export class SketchAppShell extends LitElement {
       align-self: stretch;
       overflow-y: auto;
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0; /* Critical for proper flex child behavior */
     }
 
     #view-container-inner {
       max-width: 1200px;
+      width: calc(100% - 40px);
       margin: 0 auto;
       position: relative;
       padding-bottom: 10px;
       padding-top: 10px;
+      display: flex;
+      flex-direction: column;
+      height: 100%; /* Ensure it takes full height of parent */
     }
 
     #chat-input {
@@ -160,10 +168,17 @@ export class SketchAppShell extends LitElement {
       text-overflow: ellipsis;
     }
 
-    /* Allow the container to expand to full width in diff mode */
-    #view-container-inner.diff-active {
+    /* Allow the container to expand to full width and height in diff mode */
+    #view-container-inner.diff-active,
+    #view-container-inner.diff2-active {
       max-width: 100%;
       width: 100%;
+      height: 100%;
+      padding: 0; /* Remove padding for more space */
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0; /* Critical for flex behavior */
     }
 
     /* Individual view styles */
@@ -173,6 +188,23 @@ export class SketchAppShell extends LitElement {
     .terminal-view {
       display: none; /* Hidden by default */
       width: 100%;
+      height: 100%;
+    }
+    
+    /* Make chat view take full width available */
+    .chat-view.view-active {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+    }
+    
+    /* Monaco diff2 view needs to take all available space */
+    .diff2-view.view-active {
+      flex: 1;
+      overflow: hidden;
+      min-height: 0; /* Required for proper flex child behavior */
+      display: flex;
+      flex-direction: column;
       height: 100%;
     }
 
@@ -477,7 +509,7 @@ export class SketchAppShell extends LitElement {
     }
   }
 
-  updateUrlForViewMode(mode: "chat" | "diff" | "monaco" | "terminal"): void {
+  updateUrlForViewMode(mode: ViewMode): void {
     // Get the current URL without search parameters
     const url = new URL(window.location.href);
 
@@ -513,7 +545,7 @@ export class SketchAppShell extends LitElement {
    * Handle view mode selection event
    */
   private _handleViewModeSelect(event: CustomEvent) {
-    const mode = event.detail.mode as "chat" | "diff" | "monaco" | "terminal";
+    const mode = event.detail.mode as "chat" | "diff" | "diff2" | "terminal";
     this.toggleViewMode(mode, true);
   }
 
@@ -576,19 +608,25 @@ export class SketchAppShell extends LitElement {
       );
       const chatView = this.shadowRoot?.querySelector(".chat-view");
       const diffView = this.shadowRoot?.querySelector(".diff-view");
-
+      const diff2View = this.shadowRoot?.querySelector(".diff2-view");
       const terminalView = this.shadowRoot?.querySelector(".terminal-view");
 
       // Remove active class from all views
       chatView?.classList.remove("view-active");
       diffView?.classList.remove("view-active");
+      diff2View?.classList.remove("view-active");
       terminalView?.classList.remove("view-active");
 
       // Add/remove diff-active class on view container
       if (mode === "diff") {
         viewContainerInner?.classList.add("diff-active");
+        viewContainerInner?.classList.remove("diff2-active");
+      } else if (mode === "diff2") {
+        viewContainerInner?.classList.add("diff2-active");
+        viewContainerInner?.classList.remove("diff-active");
       } else {
         viewContainerInner?.classList.remove("diff-active");
+        viewContainerInner?.classList.remove("diff2-active");
       }
 
       // Add active class to the selected view
@@ -605,6 +643,16 @@ export class SketchAppShell extends LitElement {
             (diffViewComp as any).showCommitDiff(this.currentCommitHash);
           } else if (diffViewComp) {
             (diffViewComp as any).loadDiffContent();
+          }
+          break;
+          
+        case "diff2":
+          diff2View?.classList.add("view-active");
+          // Refresh git/recentlog when Monaco diff view is opened
+          // This ensures branch information is always up-to-date, as branches can change frequently
+          const diff2ViewComp = this.shadowRoot?.querySelector("sketch-diff2-view");
+          if (diff2ViewComp) {
+            (diff2ViewComp as any).refreshDiffView();
           }
           break;
 
@@ -1008,6 +1056,7 @@ export class SketchAppShell extends LitElement {
           >
             <sketch-diff2-view
               .commit=${this.currentCommitHash}
+              .gitService=${new DefaultGitDataService()}
             ></sketch-diff2-view>
           </div>
 

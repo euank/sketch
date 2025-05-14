@@ -340,7 +340,8 @@ func esbuildBundle(outDir, src, metafilePath string) error {
 		"--loader:.eot=file",
 		"--loader:.woff=file",
 		"--loader:.woff2=file",
-		"--public-path=/static/",
+		// This changes where the sourcemap points to; we need relative dirs if we're proxied into a subdirectory.
+		"--public-path=.",
 	}
 
 	// Add metafile option if path is provided

@@ -1,22 +1,27 @@
 import { css, html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import "./sketch-diff-navigation";
 import "./sketch-monaco-view";
-import { DiffFile } from "./sketch-diff-navigation";
+import "./sketch-diff-range-picker";
+import "./sketch-diff-file-picker";
+import { GitDiffFile, GitDataService, DefaultGitDataService } from "./git-data-service";
+import { DiffRange } from "./sketch-diff-range-picker";
 
 /**
- * A component that displays diffs using Monaco editor with file navigation
+ * A component that displays diffs using Monaco editor with range and file pickers
  */
 @customElement("sketch-diff2-view")
 export class SketchDiff2View extends LitElement {
   @property({ type: String })
-  commit: string = "HEAD";
+  initialCommit: string = "";
 
   @property({ type: String })
   selectedFilePath: string = "";
 
   @state()
-  private files: DiffFile[] = [];
+  private files: GitDiffFile[] = [];
+  
+  @state()
+  private currentRange: DiffRange = { type: 'range', from: '', to: 'HEAD' };
 
   @state()
   private originalCode: string = "";
@@ -35,29 +40,51 @@ export class SketchDiff2View extends LitElement {
       display: flex;
       height: 100%;
       flex: 1;
+      flex-direction: column;
+      min-height: 0; /* Critical for flex child behavior */
+      overflow: hidden;
+      position: relative; /* Establish positioning context */
+    }
+
+    .controls {
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--border-color, #e0e0e0);
+      background-color: var(--background-light, #f8f8f8);
+      flex-shrink: 0; /* Prevent controls from shrinking */
+    }
+    
+    .controls-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .range-row {
+      width: 100%;
+      display: flex;
+    }
+    
+    .file-row {
+      width: 100%;
+      display: flex;
+    }
+    
+    sketch-diff-range-picker {
+      width: 100%;
+    }
+    
+    sketch-diff-file-picker {
+      width: 100%;
     }
 
     .diff-container {
-      display: flex;
-      height: 100%;
-      width: 100%;
-      overflow: hidden;
-    }
-
-    .navigation {
-      width: 250px;
-      flex-shrink: 0;
-      border-right: 1px solid var(--border-color, #e0e0e0);
-      overflow-y: auto;
-      height: 100%;
-    }
-
-    .monaco-container {
       flex: 1;
-      height: 100%;
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      min-height: 0; /* Critical for flex child to respect parent height */
+      position: relative; /* Establish positioning context */
+      height: 100%; /* Take full height */
     }
 
     .diff-header {
@@ -67,6 +94,7 @@ export class SketchDiff2View extends LitElement {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-shrink: 0; /* Prevent header from shrinking */
     }
 
     .diff-header h2 {
@@ -81,6 +109,10 @@ export class SketchDiff2View extends LitElement {
     .diff-content {
       flex: 1;
       overflow: hidden;
+      min-height: 0; /* Required for proper flex behavior */
+      display: flex; /* Required for child to take full height */
+      position: relative; /* Establish positioning context */
+      height: 100%; /* Take full height */
     }
 
     .loading {
@@ -88,41 +120,109 @@ export class SketchDiff2View extends LitElement {
       align-items: center;
       justify-content: center;
       height: 100%;
+      font-family: var(--font-family, system-ui, sans-serif);
     }
 
     .error {
       color: var(--error-color, #dc3545);
       padding: 16px;
+      font-family: var(--font-family, system-ui, sans-serif);
     }
 
     sketch-monaco-view {
       --editor-width: 100%;
       --editor-height: 100%;
+      flex: 1; /* Make Monaco view take full height */
+      display: flex; /* Required for child to take full height */
+      position: absolute; /* Absolute positioning to take full space */
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 100%; /* Take full height */
+      width: 100%;  /* Take full width */
     }
   `;
 
+  @property({ attribute: false })
+  gitService?: GitDataService;
+
+  constructor() {
+    super();
+    console.log('SketchDiff2View initialized');
+    
+    // Fix for monaco-aria-container positioning
+    // Add a global style to ensure proper positioning of aria containers
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+      .monaco-aria-container {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 1px !important;
+        height: 1px !important;
+        overflow: hidden !important;
+        clip: rect(1px, 1px, 1px, 1px) !important;
+        white-space: nowrap !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        z-index: -1 !important;
+      }
+    `;
+    document.head.appendChild(styleElement);
+  }
+
   connectedCallback() {
     super.connectedCallback();
-    this.loadDiffData();
+    // Ensure gitService is defined
+    if (!this.gitService) {
+      this.gitService = new DefaultGitDataService();
+    }
+    
+    // Initialize with default range and load data
+    // Get base commit if not set
+    if (this.currentRange.type === 'range' && !('from' in this.currentRange && this.currentRange.from)) {
+      this.gitService.getBaseCommitRef().then(baseRef => {
+        this.currentRange = { type: 'range', from: baseRef, to: 'HEAD' };
+        this.loadDiffData();
+      }).catch(error => {
+        console.error('Error getting base commit ref:', error);
+        // Use default range
+        this.loadDiffData();
+      });
+    } else {
+      this.loadDiffData();
+    }
   }
 
   render() {
     return html`
-      <div class="diff-container">
-        <div class="navigation">
-          <sketch-diff-navigation
-            .files="${this.files}"
-            .selectedFilePath="${this.selectedFilePath}"
-            @file-selected="${this.handleFileSelected}"
-          ></sketch-diff-navigation>
+      <div class="controls">
+        <div class="controls-container">
+          <div class="range-row">
+            <sketch-diff-range-picker
+              .gitService="${this.gitService}"
+              @range-change="${this.handleRangeChange}"
+            ></sketch-diff-range-picker>
+          </div>
+          
+          <div class="file-row">
+            <sketch-diff-file-picker
+              .files="${this.files}"
+              .selectedPath="${this.selectedFilePath}"
+              @file-selected="${this.handleFileSelected}"
+            ></sketch-diff-file-picker>
+          </div>
         </div>
-        <div class="monaco-container">
-          <div class="diff-header">
-            <h2>${this.selectedFilePath || 'Select a file'}</h2>
-          </div>
-          <div class="diff-content">
-            ${this.renderDiffContent()}
-          </div>
+      </div>
+
+      <div class="diff-container">
+        <div class="diff-header">
+          <h2>${this.selectedFilePath || 'Select a file'}</h2>
+        </div>
+        <div class="diff-content">
+          ${this.renderDiffContent()}
         </div>
       </div>
     `;
@@ -153,97 +253,97 @@ export class SketchDiff2View extends LitElement {
   }
 
   /**
-   * Load diff data for the current commit
+   * Load diff data for the current range
    */
   async loadDiffData() {
     this.loading = true;
     this.error = null;
 
+    // Ensure gitService is defined
+    if (!this.gitService) {
+      this.gitService = new DefaultGitDataService();
+    }
+
     try {
-      // Fetch the raw diff data
-      const response = await fetch(`git/rawdiff?commit=${this.commit}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch diff: ${response.statusText}`);
+      // Initialize files as empty array if undefined
+      if (!this.files) {
+        this.files = [];
       }
 
-      const diffData = await response.json();
-      this.files = this.processRawDiff(diffData);
+      // Load diff data based on the current range type
+      if (this.currentRange.type === 'single') {
+        this.files = await this.gitService.getCommitDiff(this.currentRange.commit);
+      } else {
+        this.files = await this.gitService.getDiff(this.currentRange.from, this.currentRange.to);
+      }
 
-      // If files are available, select the first one
+      // Ensure files is always an array, even when API returns null
+      if (!this.files) {
+        this.files = [];
+      }
+      
+      // If we have files, select the first one and load its content
       if (this.files.length > 0) {
-        this.selectedFilePath = this.files[0].path;
-        await this.loadFileContent(this.files[0]);
+        const firstFile = this.files[0];
+        this.selectedFilePath = firstFile.path;
+        
+        // Directly load the file content, especially important when there's only one file
+        // as sometimes the file-selected event might not fire in that case
+        this.loadFileContent(firstFile);
+      } else {
+        // No files to display - reset the view to initial state
+        this.selectedFilePath = '';
+        this.originalCode = '';
+        this.modifiedCode = '';
       }
     } catch (error) {
       console.error('Error loading diff data:', error);
       this.error = `Error loading diff data: ${error.message}`;
+      // Ensure files is an empty array when an error occurs
+      this.files = [];
+      // Reset the view to initial state
+      this.selectedFilePath = '';
+      this.originalCode = '';
+      this.modifiedCode = '';
     } finally {
       this.loading = false;
     }
   }
 
   /**
-   * Process raw diff data into a list of files
-   */
-  processRawDiff(diffData: any): DiffFile[] {
-    // Extract file information from the raw diff data
-    // Format will depend on the output format of your /git/rawdiff endpoint
-    // This is a placeholder implementation
-    const files: DiffFile[] = [];
-
-    if (diffData && Array.isArray(diffData.files)) {
-      return diffData.files.map((file: any) => ({
-        path: file.filename || file.path,
-        changeType: file.status || 'M',
-        oldPath: file.old_path || undefined
-      }));
-    }
-
-    return files;
-  }
-
-  /**
    * Load the content of the selected file
    */
-  async loadFileContent(file: DiffFile) {
+  async loadFileContent(file: GitDiffFile) {
     this.loading = true;
     this.error = null;
 
     try {
-      // Determine how to fetch content based on the change type
-      if (file.changeType === 'A') {
+      let fromCommit: string;
+      let toCommit: string;
+      
+      // Determine the commits to compare based on the current range
+      if (this.currentRange.type === 'single') {
+        fromCommit = `${this.currentRange.commit}^`;
+        toCommit = this.currentRange.commit;
+      } else {
+        fromCommit = this.currentRange.from;
+        toCommit = this.currentRange.to;
+      }
+
+      // Determine how to fetch content based on the file status
+      if (file.status === 'A') {
         // Added file: empty original, current content for modified
         this.originalCode = '';
-        const modifiedResponse = await fetch(`git/show?hash=${this.commit}:${file.path}`);
-        if (!modifiedResponse.ok) {
-          throw new Error(`Failed to fetch modified content: ${modifiedResponse.statusText}`);
-        }
-        const modifiedData = await modifiedResponse.json();
-        this.modifiedCode = modifiedData.output || '';
-      } else if (file.changeType === 'D') {
+        this.modifiedCode = await this.gitService.getFileContent(toCommit, file.path);
+      } else if (file.status === 'D') {
         // Deleted file: original content, empty modified
-        const originalResponse = await fetch(`git/show?hash=${this.commit}^:${file.path}`);
-        if (!originalResponse.ok) {
-          throw new Error(`Failed to fetch original content: ${originalResponse.statusText}`);
-        }
-        const originalData = await originalResponse.json();
-        this.originalCode = originalData.output || '';
+        this.originalCode = await this.gitService.getFileContent(fromCommit, file.path);
         this.modifiedCode = '';
       } else {
         // Modified or renamed file: need both contents
-        const originalResponse = await fetch(`git/show?hash=${this.commit}^:${file.oldPath || file.path}`);
-        if (!originalResponse.ok) {
-          throw new Error(`Failed to fetch original content: ${originalResponse.statusText}`);
-        }
-        const originalData = await originalResponse.json();
-        this.originalCode = originalData.output || '';
-
-        const modifiedResponse = await fetch(`git/show?hash=${this.commit}:${file.path}`);
-        if (!modifiedResponse.ok) {
-          throw new Error(`Failed to fetch modified content: ${modifiedResponse.statusText}`);
-        }
-        const modifiedData = await modifiedResponse.json();
-        this.modifiedCode = modifiedData.output || '';
+        const sourcePath = file.oldPath || file.path;
+        this.originalCode = await this.gitService.getFileContent(fromCommit, sourcePath);
+        this.modifiedCode = await this.gitService.getFileContent(toCommit, file.path);
       }
     } catch (error) {
       console.error('Error loading file content:', error);
@@ -254,21 +354,43 @@ export class SketchDiff2View extends LitElement {
   }
 
   /**
-   * Handle file selection event from the navigation component
+   * Handle range change event from the range picker
+   */
+  handleRangeChange(event: CustomEvent) {
+    const { range } = event.detail;
+    console.log('Range changed:', range);
+    this.currentRange = range;
+    
+    // Load diff data for the new range
+    this.loadDiffData();
+  }
+
+  /**
+   * Handle file selection event from the file picker
    */
   handleFileSelected(event: CustomEvent) {
-    const file = event.detail.file as DiffFile;
+    const file = event.detail.file as GitDiffFile;
     this.selectedFilePath = file.path;
     this.loadFileContent(file);
   }
 
   /**
-   * Update when properties change
+   * Refresh the diff view by reloading commits and diff data
+   * 
+   * This is called when the Monaco diff tab is activated to ensure:
+   * 1. Branch information from git/recentlog is current (branches can change frequently)
+   * 2. The diff content is synchronized with the latest repository state
+   * 3. Users always see up-to-date information without manual refresh
    */
-  updated(changedProperties: Map<string, any>) {
-    if (changedProperties.has('commit')) {
-      this.loadDiffData();
+  refreshDiffView() {
+    // First refresh the range picker to get updated branch information
+    const rangePicker = this.shadowRoot?.querySelector('sketch-diff-range-picker');
+    if (rangePicker) {
+      (rangePicker as any).loadCommits();
     }
+    
+    // Then reload diff data based on the current range
+    this.loadDiffData();
   }
 }
 
