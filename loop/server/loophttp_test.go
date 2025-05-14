@@ -27,6 +27,7 @@ type mockAgent struct {
 	initialCommit            string
 	title                    string
 	branchName               string
+	workingDir               string
 }
 
 func (m *mockAgent) NewIterator(ctx context.Context, nextMessageIdx int) loop.MessageIterator {
@@ -198,6 +199,10 @@ func (m *mockAgent) SketchGitBase() string {
 	return m.initialCommit
 }
 
+func (m *mockAgent) SketchGitBaseRef() string {
+	return "sketch-base-test-session"
+}
+
 func (m *mockAgent) Title() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -220,7 +225,7 @@ func (m *mockAgent) CancelTurn(cause error)                      {}
 func (m *mockAgent) CancelToolUse(id string, cause error) error  { return nil }
 func (m *mockAgent) TotalUsage() conversation.CumulativeUsage    { return conversation.CumulativeUsage{} }
 func (m *mockAgent) OriginalBudget() conversation.Budget         { return conversation.Budget{} }
-func (m *mockAgent) WorkingDir() string                          { return "/app" }
+func (m *mockAgent) WorkingDir() string                          { return m.workingDir }
 func (m *mockAgent) Diff(commit *string) (string, error)         { return "", nil }
 func (m *mockAgent) OS() string                                  { return "linux" }
 func (m *mockAgent) SessionID() string                           { return "test-session" }
@@ -379,3 +384,87 @@ func TestSSEStream(t *testing.T) {
 		t.Errorf("Did not receive any events")
 	}
 }
+
+func TestGitRawDiffHandler(t *testing.T) {
+	// Create a mock agent
+	mockAgent := &mockAgent{
+		workingDir: t.TempDir(), // Use a temp directory
+	}
+
+	// Create the server with the mock agent
+	server, err := server.New(mockAgent, nil)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	// Create a test HTTP server
+	testServer := httptest.NewServer(server)
+	defer testServer.Close()
+
+	// Test missing parameters
+	resp, err := http.Get(testServer.URL + "/git/rawdiff")
+	if err != nil {
+		t.Fatalf("Failed to make HTTP request: %v", err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected status bad request, got: %d", resp.StatusCode)
+	}
+
+	// Test with commit parameter (this will fail due to no git repo, but we're testing the API, not git)
+	resp, err = http.Get(testServer.URL + "/git/rawdiff?commit=HEAD")
+	if err != nil {
+		t.Fatalf("Failed to make HTTP request: %v", err)
+	}
+	// We expect an error since there's no git repository, but the request should be processed
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("Expected status 500, got: %d", resp.StatusCode)
+	}
+
+	// Test with from/to parameters
+	resp, err = http.Get(testServer.URL + "/git/rawdiff?from=HEAD~1&to=HEAD")
+	if err != nil {
+		t.Fatalf("Failed to make HTTP request: %v", err)
+	}
+	// We expect an error since there's no git repository, but the request should be processed
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("Expected status 500, got: %d", resp.StatusCode)
+	}
+}
+
+func TestGitShowHandler(t *testing.T) {
+	// Create a mock agent
+	mockAgent := &mockAgent{
+		workingDir: t.TempDir(), // Use a temp directory
+	}
+
+	// Create the server with the mock agent
+	server, err := server.New(mockAgent, nil)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	// Create a test HTTP server
+	testServer := httptest.NewServer(server)
+	defer testServer.Close()
+
+	// Test missing parameter
+	resp, err := http.Get(testServer.URL + "/git/show")
+	if err != nil {
+		t.Fatalf("Failed to make HTTP request: %v", err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected status bad request, got: %d", resp.StatusCode)
+	}
+
+	// Test with hash parameter (this will fail due to no git repo, but we're testing the API, not git)
+	resp, err = http.Get(testServer.URL + "/git/show?hash=HEAD")
+	if err != nil {
+		t.Fatalf("Failed to make HTTP request: %v", err)
+	}
+	// We expect an error since there's no git repository, but the request should be processed
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("Expected status 500, got: %d", resp.StatusCode)
+	}
+}
+
+// Removing duplicate method definition
