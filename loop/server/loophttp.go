@@ -23,6 +23,7 @@ import (
 	"syscall"
 	"time"
 
+	"sketch.dev/git_tools"
 	"sketch.dev/loop/server/gzhandler"
 
 	"github.com/creack/pty"
@@ -130,6 +131,11 @@ func New(agent loop.CodingAgent, logFile *os.File) (*Server, error) {
 	}
 
 	s.mux.HandleFunc("/stream", s.handleSSEStream)
+
+	// Git tool endpoints
+	s.mux.HandleFunc("/git/rawdiff", s.handleGitRawDiff)
+	s.mux.HandleFunc("/git/show", s.handleGitShow)
+
 	s.mux.HandleFunc("/diff", func(w http.ResponseWriter, r *http.Request) {
 		// Check if a specific commit hash was requested
 		commit := r.URL.Query().Get("commit")
@@ -1198,5 +1204,84 @@ func (s *Server) getState() State {
 		InContainer:          s.agent.IsInContainer(),
 		FirstMessageIndex:    s.agent.FirstMessageIndex(),
 		AgentState:           s.agent.CurrentStateName(),
+	}
+}
+
+func (s *Server) handleGitRawDiff(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get the git working directory from agent
+	repoDir := s.agent.WorkingDir()
+
+	// Parse query parameters
+	query := r.URL.Query()
+	commit := query.Get("commit")
+	from := query.Get("from")
+	to := query.Get("to")
+
+	// If commit is specified, use commit^ and commit as from and to
+	if commit != "" {
+		from = commit + "^"
+		to = commit
+	}
+
+	// Check if we have enough parameters
+	if from == "" || to == "" {
+		http.Error(w, "Missing required parameters: either 'commit' or both 'from' and 'to'", http.StatusBadRequest)
+		return
+	}
+
+	// Call the git_tools function
+	diff, err := git_tools.GitRawDiff(repoDir, from, to)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error getting git diff: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Return the result as JSON
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(diff); err != nil {
+		http.Error(w, fmt.Sprintf("Error encoding response: %v", err), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) handleGitShow(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get the git working directory from agent
+	repoDir := s.agent.WorkingDir()
+
+	// Parse query parameters
+	hash := r.URL.Query().Get("hash")
+	if hash == "" {
+		http.Error(w, "Missing required parameter: 'hash'", http.StatusBadRequest)
+		return
+	}
+
+	// Call the git_tools function
+	show, err := git_tools.GitShow(repoDir, hash)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error running git show: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Create a JSON response
+	response := map[string]string{
+		"hash":   hash,
+		"output": show,
+	}
+
+	// Return the result as JSON
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, fmt.Sprintf("Error encoding response: %v", err), http.StatusInternalServerError)
+		return
 	}
 }
