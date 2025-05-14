@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sketch Monaco Viewer Demo</title>
+    <script type="module" src="../sketch-monaco-view.ts"></script>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+
+      h1 {
+        color: #333;
+        margin-bottom: 2rem;
+      }
+
+      .control-panel {
+        margin-bottom: 2rem;
+        padding: 1rem;
+        background-color: #f0f0f0;
+        border-radius: 4px;
+      }
+      
+      button {
+        padding: 8px 12px;
+        background-color: #4285f4;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 8px;
+      }
+      
+      button:hover {
+        background-color: #3367d6;
+      }
+      
+      sketch-monaco-view {
+        margin-top: 20px;
+        height: 500px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Sketch Monaco Viewer Demo</h1>
+
+    <div class="control-panel">
+      <p>This is a demo page for the sketch-monaco-view component.</p>
+      <div>
+        <button id="example1">Example 1: JavaScript</button>
+        <button id="example2">Example 2: HTML</button>
+        <button id="example3">Example 3: Go</button>
+      </div>
+    </div>
+
+    <sketch-monaco-view id="diffEditor"></sketch-monaco-view>
+    
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const diffEditor = document.getElementById('diffEditor');
+        
+        // Set initial example
+        diffEditor.originalCode = `function hello() {
+  console.log("Hello World");
+  return true;
+}`;
+        
+        diffEditor.modifiedCode = `function hello() {
+  // Add a comment
+  console.log("Hello Updated World");
+  return true;
+}`;
+        
+        // Example 1: JavaScript
+        document.getElementById('example1').addEventListener('click', () => {
+          diffEditor.setOriginalCode(
+            `function calculateTotal(items) {
+  return items
+    .map(item => item.price * item.quantity)
+    .reduce((a, b) => a + b, 0);
+}`,
+            'original.js'
+          );
+          
+          diffEditor.setModifiedCode(
+            `function calculateTotal(items) {
+  // Apply discount if available
+  return items
+    .map(item => {
+      const price = item.discount ? 
+        item.price * (1 - item.discount) : 
+        item.price;
+      return price * item.quantity;
+    })
+    .reduce((a, b) => a + b, 0);
+}`,
+            'modified.js'
+          );
+        });
+        
+        // Example 2: HTML
+        document.getElementById('example2').addEventListener('click', () => {
+          diffEditor.setOriginalCode(
+            `<!DOCTYPE html>
+<html>
+<head>
+  <title>Demo Page</title>
+</head>
+<body>
+  <h1>Hello World</h1>
+  <p>This is a paragraph.</p>
+</body>
+</html>`,
+            'original.html'
+          );
+          
+          diffEditor.setModifiedCode(
+            `<!DOCTYPE html>
+<html>
+<head>
+  <title>Demo Page</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Hello World</h1>
+  </header>
+  <main>
+    <p>This is a paragraph with some <strong>bold</strong> text.</p>
+  </main>
+  <footer>
+    <p>&copy; 2025</p>
+  </footer>
+</body>
+</html>`,
+            'modified.html'
+          );
+        });
+        
+        // Example 3: Go
+        document.getElementById('example3').addEventListener('click', () => {
+          diffEditor.setOriginalCode(
+            `package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("Hello, world!")
+}`,
+            'original.go'
+          );
+          
+          diffEditor.setModifiedCode(
+            `package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	fmt.Println("Hello, world!")
+	fmt.Printf("The time is %s\n", time.Now().Format(time.RFC3339))
+}`,
+            'modified.go'
+          );
+        });
+      });
+    </script>
+  </body>
+</html>

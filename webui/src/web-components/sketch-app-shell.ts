@@ -8,6 +8,9 @@ import "./sketch-chat-input";
 import "./sketch-container-status";
 import "./sketch-diff-view";
 import { SketchDiffView } from "./sketch-diff-view";
+import "./sketch-diff2-view";
+import "./sketch-diff-navigation";
+import "./sketch-monaco-view";
 import "./sketch-network-status";
 import "./sketch-call-status";
 import "./sketch-terminal";
@@ -18,13 +21,13 @@ import "./sketch-restart-modal";
 import { createRef, ref } from "lit/directives/ref.js";
 import { SketchChatInput } from "./sketch-chat-input";
 
-type ViewMode = "chat" | "diff" | "terminal";
+type ViewMode = "chat" | "diff" | "diff2" | "terminal";
 
 @customElement("sketch-app-shell")
 export class SketchAppShell extends LitElement {
   // Current view mode (chat, diff, terminal)
   @state()
-  viewMode: "chat" | "diff" | "terminal" = "chat";
+  viewMode: "chat" | "diff" | "diff2" | "terminal" = "chat";
 
   // Current commit hash for diff view
   @state()
@@ -166,9 +169,11 @@ export class SketchAppShell extends LitElement {
     /* Individual view styles */
     .chat-view,
     .diff-view,
+    .diff2-view,
     .terminal-view {
       display: none; /* Hidden by default */
       width: 100%;
+      height: 100%;
     }
 
     /* Active view styles - these will be applied via JavaScript */
@@ -472,7 +477,7 @@ export class SketchAppShell extends LitElement {
     }
   }
 
-  updateUrlForViewMode(mode: "chat" | "diff" | "terminal"): void {
+  updateUrlForViewMode(mode: "chat" | "diff" | "monaco" | "terminal"): void {
     // Get the current URL without search parameters
     const url = new URL(window.location.href);
 
@@ -508,7 +513,7 @@ export class SketchAppShell extends LitElement {
    * Handle view mode selection event
    */
   private _handleViewModeSelect(event: CustomEvent) {
-    const mode = event.detail.mode as "chat" | "diff" | "terminal";
+    const mode = event.detail.mode as "chat" | "diff" | "monaco" | "terminal";
     this.toggleViewMode(mode, true);
   }
 
@@ -997,6 +1002,14 @@ export class SketchAppShell extends LitElement {
               .commitHash=${this.currentCommitHash}
             ></sketch-diff-view>
           </div>
+          
+          <div
+            class="diff2-view ${this.viewMode === "diff2" ? "view-active" : ""}"
+          >
+            <sketch-diff2-view
+              .commit=${this.currentCommitHash}
+            ></sketch-diff2-view>
+          </div>
 
           <div
             class="terminal-view ${this.viewMode === "terminal"
@@ -1005,6 +1018,7 @@ export class SketchAppShell extends LitElement {
           >
             <sketch-terminal></sketch-terminal>
           </div>
+
         </div>
       </div>
 

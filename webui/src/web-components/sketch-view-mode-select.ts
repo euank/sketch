@@ -6,7 +6,7 @@ import "./sketch-container-status";
 export class SketchViewModeSelect extends LitElement {
   // Current active mode
   @property()
-  activeMode: "chat" | "diff" | "terminal" = "chat";
+  activeMode: "chat" | "diff" | "diff2" | "terminal" = "chat";
   // Header bar: view mode buttons
 
   static styles = css`
@@ -87,7 +87,7 @@ export class SketchViewModeSelect extends LitElement {
   /**
    * Handle view mode button clicks
    */
-  private _handleViewModeClick(mode: "chat" | "diff" | "terminal") {
+  private _handleViewModeClick(mode: "chat" | "diff" | "diff2" | "terminal") {
     // Dispatch a custom event to notify the app shell to change the view
     const event = new CustomEvent("view-mode-select", {
       detail: { mode },
@@ -140,6 +140,16 @@ export class SketchViewModeSelect extends LitElement {
           <span>Diff</span>
         </button>
 
+        <button
+          id="showDiff2Button"
+          class="tab-btn ${this.activeMode === "diff2" ? "active" : ""}"
+          title="Monaco Diff"
+          @click=${() => this._handleViewModeClick("diff2")}
+        >
+          <span class="tab-icon">📊</span>
+          <span>Monaco Diff</span>
+        </button>
+        
         <button
           id="showTerminalButton"
           class="tab-btn ${this.activeMode === "terminal" ? "active" : ""}"

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sketch Diff2 View Demo</title>
+  <script type="module" src="../sketch-diff-navigation.ts"></script>
+  <script type="module" src="../sketch-diff2-view.ts"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 2rem;
+    }
+
+    .control-panel {
+      margin-bottom: 2rem;
+      padding: 1rem;
+      background-color: #f0f0f0;
+      border-radius: 4px;
+    }
+    
+    button {
+      padding: 8px 12px;
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 8px;
+    }
+    
+    button:hover {
+      background-color: #3367d6;
+    }
+    
+    .demo-container {
+      display: flex;
+      height: 500px;
+      border: 1px solid #ddd;
+      margin-top: 20px;
+    }
+
+    .mock-container {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+    }
+
+    .mock-navigation {
+      width: 250px;
+      border-right: 1px solid #e0e0e0;
+      background-color: #f8f8f8;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    .mock-view {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mock-header {
+      padding: 12px 16px;
+      background-color: #f5f5f5;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .mock-content {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    sketch-monaco-view {
+      height: 100%;
+      width: 100%;
+    }
+
+    .mock-file-item {
+      padding: 8px 16px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+    }
+
+    .mock-file-item:hover {
+      background-color: #f0f0f0;
+    }
+
+    .mock-file-item.selected {
+      background-color: #e6f7ff;
+      font-weight: 500;
+    }
+
+    .change-type {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      line-height: 20px;
+      text-align: center;
+      border-radius: 50%;
+      margin-right: 8px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .change-type.added {
+      background-color: #b6ffb6;
+      color: #0a6b0a;
+    }
+
+    .change-type.modified {
+      background-color: #fff8c5;
+      color: #735c0f;
+    }
+  </style>
+</head>
+<body>
+  <h1>Sketch Diff2 View Demo</h1>
+
+  <div class="control-panel">
+    <p>This demonstrates the Monaco-based diff view components.</p>
+    <div>
+      <button id="example1">Example 1: JavaScript</button>
+      <button id="example2">Example 2: Go</button>
+    </div>
+  </div>
+
+  <div class="demo-container">
+    <div class="mock-container">
+      <div class="mock-navigation" id="navigationPanel">
+        <h3 style="padding: 12px 16px; margin: 0; border-bottom: 1px solid #e0e0e0;">Changed Files</h3>
+        <div id="fileList">
+          <div class="mock-file-item selected">
+            <span class="change-type modified">M</span>
+            <span>main.js</span>
+          </div>
+          <div class="mock-file-item">
+            <span class="change-type added">A</span>
+            <span>utils.js</span>
+          </div>
+          <div class="mock-file-item">
+            <span class="change-type modified">M</span>
+            <span>styles.css</span>
+          </div>
+        </div>
+      </div>
+      <div class="mock-view">
+        <div class="mock-header">
+          <h3 style="margin: 0;">main.js</h3>
+        </div>
+        <div class="mock-content">
+          <sketch-monaco-view id="diffEditor"></sketch-monaco-view>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const diffEditor = document.getElementById('diffEditor');
+      const fileItems = document.querySelectorAll('.mock-file-item');
+      const mockHeader = document.querySelector('.mock-header h3');
+      
+      // Set initial example
+      diffEditor.originalCode = `function hello() {
+  console.log("Hello World");
+  return true;
+}`;
+      
+      diffEditor.modifiedCode = `function hello() {
+  // Add a comment
+  console.log("Hello Updated World");
+  return true;
+}`;
+
+      diffEditor.originalFilename = 'main.js';
+      diffEditor.modifiedFilename = 'main.js';
+      
+      // Example 1: JavaScript
+      document.getElementById('example1').addEventListener('click', () => {
+        diffEditor.setOriginalCode(
+          `function calculateTotal(items) {
+  return items
+    .map(item => item.price * item.quantity)
+    .reduce((a, b) => a + b, 0);
+}`,
+          'main.js'
+        );
+        
+        diffEditor.setModifiedCode(
+          `function calculateTotal(items) {
+  // Apply discount if available
+  return items
+    .map(item => {
+      const price = item.discount ? 
+        item.price * (1 - item.discount) : 
+        item.price;
+      return price * item.quantity;
+    })
+    .reduce((a, b) => a + b, 0);
+}`,
+          'main.js'
+        );
+
+        mockHeader.textContent = 'main.js';
+        updateSelectedFile('main.js');
+      });
+      
+      // Example 2: Go
+      document.getElementById('example2').addEventListener('click', () => {
+        diffEditor.setOriginalCode(
+          `package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("Hello, world!")
+}`,
+          'main.go'
+        );
+        
+        diffEditor.setModifiedCode(
+          `package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	fmt.Println("Hello, world!")
+	fmt.Printf("The time is %s\n", time.Now().Format(time.RFC3339))
+}`,
+          'main.go'
+        );
+
+        mockHeader.textContent = 'main.go';
+        updateSelectedFile('main.go');
+      });
+
+      // Handle file selection
+      fileItems.forEach(item => {
+        item.addEventListener('click', () => {
+          const fileName = item.querySelector('span:last-child').textContent;
+          mockHeader.textContent = fileName;
+          updateSelectedFile(fileName);
+
+          // Simple mock content for different files
+          if (fileName === 'utils.js') {
+            diffEditor.setOriginalCode('', 'utils.js');
+            diffEditor.setModifiedCode(
+              `// Utility functions
+function formatDate(date) {
+  return date.toISOString().split('T')[0];
+}
+
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('en-US', { 
+    style: 'currency', 
+    currency: 'USD' 
+  }).format(amount);
+}`,
+              'utils.js'
+            );
+          } else if (fileName === 'styles.css') {
+            diffEditor.setOriginalCode(
+              `body {
+  font-family: Arial, sans-serif;
+  color: #333;
+}
+
+.container {
+  width: 100%;
+  max-width: 1200px;
+}`,
+              'styles.css'
+            );
+            diffEditor.setModifiedCode(
+              `body {
+  font-family: 'Roboto', Arial, sans-serif;
+  color: #212121;
+  background-color: #f8f8f8;
+}
+
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}`,
+              'styles.css'
+            );
+          }
+        });
+      });
+
+      function updateSelectedFile(fileName) {
+        fileItems.forEach(item => {
+          const itemFileName = item.querySelector('span:last-child').textContent;
+          if (itemFileName === fileName) {
+            item.classList.add('selected');
+          } else {
+            item.classList.remove('selected');
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
