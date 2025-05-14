@@ -199,6 +199,10 @@ func (m *mockAgent) SketchGitBase() string {
 	return m.initialCommit
 }
 
+func (m *mockAgent) SketchGitBaseRef() string {
+	return "sketch-base-test-session"
+}
+
 func (m *mockAgent) Title() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

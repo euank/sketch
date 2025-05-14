@@ -89,6 +89,10 @@ type CodingAgent interface {
 	// be, for example in the case of a rebase. It is stored as a git tag.
 	SketchGitBase() string
 
+	// SketchGitBase returns the symbolic name for the "base" for Sketch's work.
+	// (Typically, this is "sketch-base")
+	SketchGitBaseRef() string
+
 	// Title returns the current title of the conversation.
 	Title() string
 

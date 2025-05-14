@@ -135,6 +135,7 @@ func New(agent loop.CodingAgent, logFile *os.File) (*Server, error) {
 	// Git tool endpoints
 	s.mux.HandleFunc("/git/rawdiff", s.handleGitRawDiff)
 	s.mux.HandleFunc("/git/show", s.handleGitShow)
+	s.mux.HandleFunc("/git/recentlog", s.handleGitRecentLog)
 
 	s.mux.HandleFunc("/diff", func(w http.ResponseWriter, r *http.Request) {
 		// Check if a specific commit hash was requested
@@ -1281,6 +1282,31 @@ func (s *Server) handleGitShow(w http.ResponseWriter, r *http.Request) {
 	// Return the result as JSON
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, fmt.Sprintf("Error encoding response: %v", err), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) handleGitRecentLog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get the git working directory and initial commit from agent
+	repoDir := s.agent.WorkingDir()
+	initialCommit := s.agent.SketchGitBaseRef()
+
+	// Call the git_tools function
+	log, err := git_tools.GitRecentLog(repoDir, initialCommit)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error getting git log: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Return the result as JSON
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(log); err != nil {
 		http.Error(w, fmt.Sprintf("Error encoding response: %v", err), http.StatusInternalServerError)
 		return
 	}
