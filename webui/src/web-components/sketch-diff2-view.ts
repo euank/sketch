@@ -91,6 +91,9 @@ export class SketchDiff2View extends LitElement {
     .file-row {
       width: 100%;
       display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
     }
     
     sketch-diff-range-picker {
@@ -98,7 +101,22 @@ export class SketchDiff2View extends LitElement {
     }
     
     sketch-diff-file-picker {
-      width: 100%;
+      flex: 1;
+    }
+    
+    .view-toggle-button {
+      background-color: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.2s;
+    }
+    
+    .view-toggle-button:hover {
+      background-color: #e0e0e0;
     }
 
     .diff-container {
@@ -220,6 +238,21 @@ export class SketchDiff2View extends LitElement {
     }
   }
 
+  // Toggle hideUnchangedRegions setting
+  @state()
+  private hideUnchangedRegionsEnabled: boolean = true;
+  
+  // Toggle hideUnchangedRegions setting
+  private toggleHideUnchangedRegions() {
+    this.hideUnchangedRegionsEnabled = !this.hideUnchangedRegionsEnabled;
+    
+    // Get the Monaco view component
+    const monacoView = this.shadowRoot?.querySelector('sketch-monaco-view');
+    if (monacoView) {
+      (monacoView as any).toggleHideUnchangedRegions(this.hideUnchangedRegionsEnabled);
+    }
+  }
+  
   render() {
     return html`
       <div class="controls">
@@ -237,6 +270,14 @@ export class SketchDiff2View extends LitElement {
               .selectedPath="${this.selectedFilePath}"
               @file-selected="${this.handleFileSelected}"
             ></sketch-diff-file-picker>
+            
+            <button 
+              class="view-toggle-button"
+              @click="${this.toggleHideUnchangedRegions}"
+              title="${this.hideUnchangedRegionsEnabled ? 'Show all code' : 'Focus on changes'}"
+            >
+              ${this.hideUnchangedRegionsEnabled ? 'Show All Code' : 'Focus on Changes'}
+            </button>
           </div>
         </div>
       </div>

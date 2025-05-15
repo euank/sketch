@@ -415,8 +415,29 @@ export class CodeDiffEditor extends LitElement {
     return langMap[extension] || this.language || "plaintext";
   }
 
+  /**
+   * Update editor options
+   */
   setOptions(value: monaco.editor.IDiffEditorConstructionOptions) {
-    this.editor!.updateOptions(value);
+    if (this.editor) {
+      this.editor.updateOptions(value);
+    }
+  }
+  
+  /**
+   * Toggle hideUnchangedRegions feature
+   */
+  toggleHideUnchangedRegions(enabled: boolean) {
+    if (this.editor) {
+      this.editor.updateOptions({
+        hideUnchangedRegions: {
+          enabled: enabled,
+          contextLineCount: 3,
+          minimumLineCount: 3,
+          revealLineCount: 10
+        }
+      });
+    }
   }
 
   // Models for the editor
@@ -434,6 +455,13 @@ export class CodeDiffEditor extends LitElement {
           theme: "vs", // Always use light mode
           renderSideBySide: true,
           ignoreTrimWhitespace: false,
+          // Focus on the differences by hiding unchanged regions
+          hideUnchangedRegions: {
+            enabled: true,              // Enable the feature
+            contextLineCount: 3,        // Show 3 lines of context around each difference
+            minimumLineCount: 3,        // Hide regions only when they're at least 3 lines
+            revealLineCount: 10         // Show 10 lines when expanding a hidden region
+          }
         });
 
         console.log("Monaco diff editor created");
