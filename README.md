@@ -6,6 +6,8 @@
 
 [![Go Reference](https://pkg.go.dev/badge/sketch.dev.svg)](https://pkg.go.dev/sketch.dev)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Chat-7289DA?logo=discord&logoColor=white)](https://discord.gg/6w9qNRUDzS)
+[![GitHub Workflow Status](https://github.com/boldsoftware/sketch/actions/workflows/go_test.yml/badge.svg)](https://github.com/boldsoftware/sketch/actions/workflows/go_test.yml)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/boldsoftware/sketch/blob/main/LICENSE)
 
 **Sketch is an agentic coding tool. It draws the 🦉**
 
