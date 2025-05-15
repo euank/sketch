@@ -1,6 +1,17 @@
+<div align="center">
+
+<img src="https://storage.googleapis.com/sketch-assets/sketch-logo.png" alt="Sketch Logo" width="300"/>
+
 # Sketch
 
-Sketch is an agentic coding tool. It draws the 🦉.
+[![Go Reference](https://pkg.go.dev/badge/sketch.dev.svg)](https://pkg.go.dev/sketch.dev)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Chat-7289DA?logo=discord&logoColor=white)](https://discord.gg/6w9qNRUDzS)
+
+**Sketch is an agentic coding tool. It draws the 🦉**
+
+</div>
+
+## 🚀 Overview
 
 Sketch runs in your terminal, has a web UI, understands your code, and helps
 you get work done. To keep your environment pristine, sketch starts a docker
@@ -8,76 +19,94 @@ container and outputs its work onto a branch in your host git repository.
 
 Sketch helps with most programming environments, but Sketch has extra goodies for Go.
 
-To get started:
+<img src="https://storage.googleapis.com/sketch-assets/screenshot.jpg" alt="Sketch Screenshot" width="800"/>
+
+## 📋 Quick Start
 
 ```sh
 go install sketch.dev/cmd/sketch@latest
 sketch
 ```
 
-## Requirements
+## 🔧 Requirements
 
-Currently sketch runs on macOS and linux.
-It uses docker for containers.
+Currently, Sketch runs on macOS and Linux. It uses Docker for containers.
 
-macOS: `brew install colima` (or an equivalent, like Docker Desktop or Orbstack)
-linux: `apt install docker.io` (or equivalent for your distro)
-WSL2: install Docker Desktop for Windows (docker entirely inside WSL2 is tricky)
+| Platform | Installation                                                               |
+| -------- | -------------------------------------------------------------------------- |
+| macOS    | `brew install colima` (or Docker Desktop/Orbstack)                         |
+| Linux    | `apt install docker.io` (or equivalent for your distro)                    |
+| WSL2     | Install Docker Desktop for Windows (docker entirely inside WSL2 is tricky) |
 
 The [sketch.dev](https://sketch.dev) service is used to provide access
 to an LLM service and give you a way to access the web UI from anywhere.
 
-## Feedback/discussion
+## 🤝 Community & Feedback
 
-We have a discord server to discuss sketch.
+- **Discord**: Join our community at [https://discord.gg/6w9qNRUDzS](https://discord.gg/6w9qNRUDzS)
+- **GitHub Issues**: Submit feedback at [https://github.com/boldsoftware/sketch/issues](https://github.com/boldsoftware/sketch/issues)
 
-Join if you want! https://discord.gg/6w9qNRUDzS
+## 📖 User Guide
 
-GitHub issues are also welcome: https://github.com/boldsoftware/sketch/issues
+### Getting Started
 
-## User Guide
+Start Sketch by running `sketch` in a Git repository. It will open your browser to the Sketch chat interface, but you can also use the CLI interface. Use `-open=false` if you want to use just the CLI interface.
 
-Start sketch by running `sketch` in a git repository. It will open your browser
-to the Sketch chat interface, but you can also use the CLI interface. Use `-open=false`
-if you want to use just the CLI interface.
-
-Ask Sketch about your code base or ask Sketch to implement a feature. It may take
-a little while for Sketch to do its work, so hit the bell (🔔) icon to enable
-browser notifications. We won't spam you or anything; it will notify you
+Ask Sketch about your codebase or ask it to implement a feature. It may take a little while for Sketch to do its work, so hit the bell (🔔) icon to enable browser notifications. We won't spam you or anything; it will notify you
 when the Sketch agent's turn is done, and there's something to look at.
 
 ### How Sketch Works
 
 <!-- TODO: innie/outtie picture -->
 
-When you start Sketch, it creates a Dockerfile, builds it, copies your
-repository into it, and starts a Docker container, with the "inside" Sketch
-running inside. This design let's you <b>run multiple sketches in parallel</b>
-since they each have their own sandbox. It also lets Sketch work without worry:
-it can trash its own container, but it can't trash your machine.
+When you start Sketch, it:
 
-Sketch's agentic loop uses tool calls (mostly shell commands, but also a handful
-of other important tools) to allow the LLM to interact with your code base.
+1. Creates a Dockerfile
+2. Builds it
+3. Copies your repository into it
+4. Starts a Docker container with the "inside" Sketch running
+
+This design lets you **run multiple sketches in parallel** since they each have their own sandbox. It also lets Sketch work without worry: it can trash its own container, but it can't trash your machine.
+
+Sketch's agentic loop uses tool calls (mostly shell commands, but also a handful of other important tools) to allow the LLM to interact with your codebase.
 
 ### Getting Your Git Changes Out
 
 <!-- TODO: git picture -->
 
-Sketch is trained to make git commits. When those happen, they are
+Sketch is trained to make Git commits. When those happen, they are
 automatically pushed to the git repository where you started sketch with branch
-names `sketch/*`. Use `git branch -a --sort=creatordate | grep sketch/ | tail`
-to find them. The UI keeps track of the latest branch it pushed and displays it
-prominently. You can use `git cherry-pick $(git merge-base origin/main
-sketch/foo` or `git merge sketch/foo` or `git reset --hard sketch/foo` and so
-on to pull those branches into your workspace. Use the same workflows you would
-as if you were pulling in a friend's Pull Request.
+names `sketch/*`.
 
-Advanced: You can ask Sketch to `git fetch sketch-host` and rebase onto some commit or
-other. Doing so will also fetch where you started Sketch, and we do a bit of
-"git fetch refspec configuration" to make `origin/main` work as a git reference.
+**Finding Sketch branches:**
 
-Don't be afraid of asking Sketch to help you rebase, merge/squash commits, rewrite commit
-messages, and so forth; it's good at it!
+```sh
+git branch -a --sort=creatordate | grep sketch/ | tail
+```
+
+The UI keeps track of the latest branch it pushed and displays it prominently. You can use standard Git workflows to pull those branches into your workspace:
+
+```sh
+git cherry-pick $(git merge-base origin/main sketch/foo)
+```
+
+or merge the branch
+
+```sh
+git merge sketch/foo
+```
+
+or reset to the branch
+
+```sh
+git reset --hard sketch/foo
+```
+
+Ie use the same workflows you would if you were pulling in a friend's Pull Request.
+
+**Advanced:** You can ask Sketch to `git fetch sketch-host` and rebase onto another commit. This will also fetch where you started Sketch, and we do a bit of "git fetch refspec configuration" to make `origin/main` work as a git reference.
+
+Don't be afraid of asking Sketch to help you rebase, merge/squash commits, rewrite commit messages, and so forth; it's good at it!
 
 ### Reviewing Diffs
 
@@ -87,48 +116,50 @@ comments.
 
 ### Connecting to Sketch's Container
 
-You can interact directly with the container by:
+You can interact directly with the container in three ways:
 
- 1. Using the "Terminal" tab in the UI
- 2. Using `ssh`. Look at the startup logs or click on the information icon to see a command like `ssh sketch-ilik-eske-tcha-lott`.
-We have automatically configured your SSH configuration to make these special hostnames work.
- 3. Using Visual Studio Code. Again, look for a command line or magic link behind the information icon,
-or when Sketch starts up. This starts a new VSCode session "remoted into" the container. You
-can edit the code, use the terminal, review diffs, and so forth.
+1. **Web UI Terminal**: Use the "Terminal" tab in the UI
+2. **SSH**: Look at the startup logs or click the information icon to see a command like `ssh sketch-ilik-eske-tcha-lott`.
+   We have automatically configured your SSH configuration to make these special hostnames work.
+3. **Visual Studio Code**: Look for a command line or magic link behind the information icon, or when Sketch starts up. This starts a new VSCode session "remoted into" the container. You
+   can edit the code, use the terminal, review diffs, and so forth.
 
-By using SSH (and/or VSCode), you can forward ports from the container to your
-machine. For example, if you want to start your development webserver, you can
-do something like `ssh -L8000:localhost:8888 sketch-ilik-epor-tfor-ward go run
-./cmd/server` to make `http://localhost:8000/` on your machine point to
-`localhost:8888` inside the container.
+Using SSH (and/or VSCode) allows you to forward ports from the container to your machine. For example, if you want to start your development webserver, you can do something like this:
 
+```sh
+# Forward container port 8888 to local port 8000
+ssh -L8000:localhost:8888 sketch-ilik-epor-tfor-ward go run ./cmd/server
+```
 
-### Using the Browser Tools
+This makes `http://localhost:8000/` on your machine point to `localhost:8888` inside the container.
+
+### Using Browser Tools
 
 You can ask Sketch to browse a web page and take screenshots. There are tools
 both for taking screenshots and "reading images", the latter of which sends the
 image to the LLM. This functionality is handy if you're working on a web page and
 want to see what the in-progress change looks like.
 
-## FAQ
+## ❓ FAQ
 
-### `no space left on device`
+### "No space left on device"
 
-Docker images, containers, and so forth tend to pile up. `docker prune -a` is a good
-command to start with to prune unused images and containers.
+Docker images, containers, and so forth tend to pile up. Ask Docker to prune unused images and containers:
 
-## Development
+```sh
+docker system prune -a
+```
+
+## 🛠️ Development
 
 [![Go Reference](https://pkg.go.dev/badge/sketch.dev.svg)](https://pkg.go.dev/sketch.dev)
 
-See [CONTRIBUTING.md](CONTRIBUTING.md)
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
-## Open Source
+## 📄 Open Source
 
 Sketch is open source.
 It is right here in this repository!
 Have a look around and mod away.
 
-If you want to run sketch entirely without the sketch.dev service, you can
-set the flag -skaband-addr="" and then provide an `ANTHROPIC_API_KEY`
-environment variable. (More LLM services coming soon!)
+If you want to run Sketch entirely without the sketch.dev service, you can set the flag `-skaband-addr=""` and then provide an `ANTHROPIC_API_KEY` environment variable. (More LLM services coming soon!)
