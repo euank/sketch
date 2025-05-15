@@ -11,6 +11,30 @@ import { DiffRange } from "./sketch-diff-range-picker";
  */
 @customElement("sketch-diff2-view")
 export class SketchDiff2View extends LitElement {
+  /**
+   * Handles comment events from the Monaco editor and forwards them to the chat input
+   * using the same event format as the original diff view for consistency.
+   */
+  private handleMonacoComment(event: CustomEvent) {
+    try {
+      // Validate incoming data
+      if (!event.detail || !event.detail.formattedComment) {
+        console.error('Invalid comment data received');
+        return;
+      }
+      
+      // Create and dispatch event using the standardized format
+      const commentEvent = new CustomEvent('diff-comment', {
+        detail: { comment: event.detail.formattedComment },
+        bubbles: true,
+        composed: true
+      });
+      
+      this.dispatchEvent(commentEvent);
+    } catch (error) {
+      console.error('Error handling Monaco comment:', error);
+    }
+  }
   @property({ type: String })
   initialCommit: string = "";
 
@@ -248,6 +272,7 @@ export class SketchDiff2View extends LitElement {
         .originalFilename="${this.selectedFilePath}"
         .modifiedFilename="${this.selectedFilePath}"
         readOnly
+        @monaco-comment="${this.handleMonacoComment}"
       ></sketch-monaco-view>
     `;
   }

@@ -1057,6 +1057,7 @@ export class SketchAppShell extends LitElement {
             <sketch-diff2-view
               .commit=${this.currentCommitHash}
               .gitService=${new DefaultGitDataService()}
+              @diff-comment="${this._handleDiffComment}"
             ></sketch-diff2-view>
           </div>
 
