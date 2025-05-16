@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Status Indicators Demo</title>
+    <script type="module" src="../sketch-call-status.ts"></script>
+    <script type="module" src="../sketch-network-status.ts"></script>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .demo-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .status-container {
+        padding: 20px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+      }
+      .label {
+        font-weight: bold;
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+      .status-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+      }
+      .status-item {
+        min-width: 200px;
+      }
+      h1 {
+        margin-bottom: 20px;
+      }
+      .status-view {
+        background-color: white;
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 4px;
+      }
+      .description {
+        margin-top: 10px;
+        color: #666;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Status Indicators Demo</h1>
+    <p>This demo shows the new status indicators without the green connection dot.</p>
+    
+    <div class="demo-container">
+      <div class="status-container">
+        <div class="label">Connected States:</div>
+        
+        <div class="status-row">
+          <div class="status-item">IDLE:</div>
+          <div class="status-view">
+            <sketch-call-status
+              .isDisconnected="false"
+              .isIdle="true"
+              .llmCalls="0"
+              .toolCalls="[]"
+            ></sketch-call-status>
+          </div>
+          <div class="description">Agent is connected but not actively working</div>
+        </div>
+        
+        <div class="status-row">
+          <div class="status-item">WORKING:</div>
+          <div class="status-view">
+            <sketch-call-status
+              .isDisconnected="false"
+              .isIdle="false"
+              .llmCalls="1"
+              .toolCalls='["bash"]'
+            ></sketch-call-status>
+          </div>
+          <div class="description">Agent is connected and actively working</div>
+        </div>
+      </div>
+      
+      <div class="status-container">
+        <div class="label">Disconnected State:</div>
+        
+        <div class="status-row">
+          <div class="status-item">DISCONNECTED:</div>
+          <div class="status-view">
+            <sketch-call-status
+              .isDisconnected="true"
+              .isIdle="true"
+              .llmCalls="0"
+              .toolCalls="[]"
+            ></sketch-call-status>
+          </div>
+          <div class="description">Connection lost to the agent</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

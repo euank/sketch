@@ -968,6 +968,7 @@ export class SketchAppShell extends LitElement {
               ? this.messages[this.messages.length - 1]?.end_of_turn &&
                 !this.messages[this.messages.length - 1]?.parent_conversation_id
               : true}
+            .isDisconnected=${this.connectionStatus === "disconnected"}
           ></sketch-call-status>
 
           <sketch-network-status

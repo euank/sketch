@@ -15,6 +15,9 @@ export class SketchCallStatus extends LitElement {
 
   @property()
   isIdle: boolean = false;
+  
+  @property()
+  isDisconnected: boolean = false;
 
   static styles = css`
     @keyframes gentle-pulse {
@@ -94,12 +97,12 @@ export class SketchCallStatus extends LitElement {
       font-weight: bold;
       text-align: center;
       letter-spacing: 0.5px;
-      width: 64px; /* Fixed width for the banner */
+      width: 104px; /* Wider to accommodate DISCONNECTED text */
       left: 50%;
       transform: translateX(-50%);
       top: 60%; /* Position a little below center */
       z-index: 10; /* Ensure it appears above the icons */
-      opacity: 0.6;
+      opacity: 0.9;
     }
 
     .status-working {
@@ -110,6 +113,12 @@ export class SketchCallStatus extends LitElement {
     .status-idle {
       background-color: #e6f4ea;
       color: #0d652d;
+    }
+    
+    .status-disconnected {
+      background-color: #ffebee; /* Light red */
+      color: #d32f2f; /* Red */
+      font-weight: bold;
     }
   `;
 
@@ -126,8 +135,17 @@ export class SketchCallStatus extends LitElement {
 
     const agentState = `${this.agentState ? " (" + this.agentState + ")" : ""}`;
 
-    // Determine working state - working if not idle
-    const isWorking = !this.isIdle;
+    // Determine state - disconnected takes precedence, then working vs idle
+    let statusClass = "status-idle";
+    let statusText = "IDLE";
+    
+    if (this.isDisconnected) {
+      statusClass = "status-disconnected";
+      statusText = "DISCONNECTED";
+    } else if (!this.isIdle) {
+      statusClass = "status-working";
+      statusText = "WORKING";
+    }
 
     return html`
       <div class="call-status-container">
@@ -152,9 +170,9 @@ export class SketchCallStatus extends LitElement {
           </div>
         </div>
         <div
-          class="status-banner ${isWorking ? "status-working" : "status-idle"}"
+          class="status-banner ${statusClass}"
         >
-          ${isWorking ? "WORKING" : "IDLE"}
+          ${statusText}
         </div>
       </div>
     `;

@@ -1,33 +1,28 @@
 import { test, expect } from "@sand4rt/experimental-ct-web";
 import { SketchNetworkStatus } from "./sketch-network-status";
 
-// Test for the status indicator dot
-test("shows status indicator dot when connected", async ({ mount }) => {
+// Test that the network status component doesn't display visible content
+// since we've removed the green dot indicator
+test("network status component is not visible", async ({ mount }) => {
   const component = await mount(SketchNetworkStatus, {
     props: {
       connection: "connected",
     },
   });
 
-  // The status container and indicator should be visible
-  await expect(component.locator(".status-container")).toBeVisible();
-  await expect(component.locator(".status-indicator")).toBeVisible();
-  await expect(component.locator(".status-indicator")).toHaveClass(/connected/);
+  // The status container should exist but be hidden with display: none
+  await expect(component.locator(".status-container")).toHaveCSS("display", "none");
 });
 
-// Test that tooltip shows error message when provided
-test("includes error in tooltip when provided", async ({ mount }) => {
-  const errorMsg = "Connection error";
+// Test that the network status component remains invisible regardless of connection state
+test("network status component is not visible when disconnected", async ({ mount }) => {
   const component = await mount(SketchNetworkStatus, {
     props: {
       connection: "disconnected",
-      error: errorMsg,
+      error: "Connection error",
     },
   });
 
-  await expect(component.locator(".status-indicator")).toBeVisible();
-  await expect(component.locator(".status-indicator")).toHaveAttribute(
-    "title",
-    "Connection status: disconnected - Connection error",
-  );
+  // The status container should exist but be hidden with display: none
+  await expect(component.locator(".status-container")).toHaveCSS("display", "none");
 });

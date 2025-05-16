@@ -16,43 +16,7 @@ export class SketchNetworkStatus extends LitElement {
 
   static styles = css`
     .status-container {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .status-indicator {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-    }
-
-    .status-indicator.connected {
-      background-color: #2e7d32; /* Green */
-      box-shadow: 0 0 5px rgba(46, 125, 50, 0.5);
-    }
-
-    .status-indicator.disconnected {
-      background-color: #d32f2f; /* Red */
-      box-shadow: 0 0 5px rgba(211, 47, 47, 0.5);
-    }
-
-    .status-indicator.connecting {
-      background-color: #f57c00; /* Orange */
-      box-shadow: 0 0 5px rgba(245, 124, 0, 0.5);
-      animation: pulse 1.5s infinite;
-    }
-
-    @keyframes pulse {
-      0% {
-        opacity: 0.6;
-      }
-      50% {
-        opacity: 1;
-      }
-      100% {
-        opacity: 0.6;
-      }
+      display: none; /* Hide by default - we're removing the dot */
     }
   `;
 
@@ -71,15 +35,10 @@ export class SketchNetworkStatus extends LitElement {
   }
 
   render() {
-    // Only show the status indicator dot (no text)
+    // We no longer show any content as the dot is being removed
+    // The connection status will now be handled by the call-status component
     return html`
       <div class="status-container">
-        <div
-          class="status-indicator ${this.connection}"
-          title="Connection status: ${this.connection}${this.error
-            ? ` - ${this.error}`
-            : ""}"
-        ></div>
       </div>
     `;
   }

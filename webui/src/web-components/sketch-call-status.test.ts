@@ -136,3 +136,48 @@ test("has correct tooltip text for tool calls", async ({ mount }) => {
     "2 tool calls in progress: bash, think",
   );
 });
+
+test("displays IDLE status when isIdle is true and not disconnected", async ({ mount }) => {
+  const component = await mount(SketchCallStatus, {
+    props: {
+      isIdle: true,
+      isDisconnected: false,
+      llmCalls: 0,
+      toolCalls: [],
+    },
+  });
+
+  // Check that the status banner has the correct class and text
+  await expect(component.locator(".status-banner")).toHaveClass(/status-idle/);
+  await expect(component.locator(".status-banner")).toHaveText("IDLE");
+});
+
+test("displays WORKING status when isIdle is false and not disconnected", async ({ mount }) => {
+  const component = await mount(SketchCallStatus, {
+    props: {
+      isIdle: false,
+      isDisconnected: false,
+      llmCalls: 1,
+      toolCalls: [],
+    },
+  });
+
+  // Check that the status banner has the correct class and text
+  await expect(component.locator(".status-banner")).toHaveClass(/status-working/);
+  await expect(component.locator(".status-banner")).toHaveText("WORKING");
+});
+
+test("displays DISCONNECTED status when isDisconnected is true regardless of isIdle", async ({ mount }) => {
+  const component = await mount(SketchCallStatus, {
+    props: {
+      isIdle: true, // Even when idle
+      isDisconnected: true,
+      llmCalls: 0,
+      toolCalls: [],
+    },
+  });
+
+  // Check that the status banner has the correct class and text
+  await expect(component.locator(".status-banner")).toHaveClass(/status-disconnected/);
+  await expect(component.locator(".status-banner")).toHaveText("DISCONNECTED");
+});

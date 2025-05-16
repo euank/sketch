@@ -3,20 +3,51 @@
     <title>sketch-network-status demo</title>
     <link rel="stylesheet" href="demo.css" />
     <script type="module" src="../sketch-network-status.ts"></script>
+    <script type="module" src="../sketch-call-status.ts"></script>
+    <style>
+      .status-container {
+        margin: 20px 0;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      .label {
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+    </style>
   </head>
   <body>
-    <h1>sketch-network-status demo</h1>
-
-    Connected:
-    <sketch-network-status
-      connection="connected"
-      message="connected"
-    ></sketch-network-status>
-
-    Error:
-    <sketch-network-status
-      connection="error"
-      error="error"
-    ></sketch-network-status>
+    <h1>Status Indicators Demo</h1>
+    
+    <div class="status-container">
+      <div class="label">Connected State:</div>
+      <sketch-call-status
+        .isDisconnected=${false}
+        .isIdle=${true}
+        .llmCalls=${0}
+        .toolCalls=${[]}
+      ></sketch-call-status>
+    </div>
+    
+    <div class="status-container">
+      <div class="label">Working State:</div>
+      <sketch-call-status
+        .isDisconnected=${false}
+        .isIdle=${false}
+        .llmCalls=${1}
+        .toolCalls=${["bash"]}
+      ></sketch-call-status>
+    </div>
+    
+    <div class="status-container">
+      <div class="label">Disconnected State:</div>
+      <sketch-call-status
+        .isDisconnected=${true}
+        .isIdle=${true}
+        .llmCalls=${0}
+        .toolCalls=${[]}
+      ></sketch-call-status>
+    </div>
   </body>
 </html>
