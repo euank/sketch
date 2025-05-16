@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sketch Monaco Diff View Demo</title>
+  <script type="module">
+    // Set up the demo environment with mock data service
+    import { MockGitDataService } from './mock-git-data-service.ts';
+    import '../sketch-diff2-view.ts';
+    
+    // Wait for DOM content to be loaded before initializing components
+    document.addEventListener('DOMContentLoaded', () => {
+      // Create a mock service instance
+      const mockService = new MockGitDataService();
+      console.log('Demo initialized with MockGitDataService');
+      
+      // Get the diff2 view component and set its gitService property
+      const diff2View = document.querySelector('sketch-diff2-view');
+      if (diff2View) {
+        diff2View.gitService = mockService;
+      }
+    });
+  </script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 2rem;
+    }
+
+    .control-panel {
+      margin-bottom: 2rem;
+      padding: 1rem;
+      background-color: #f0f0f0;
+      border-radius: 4px;
+    }
+    
+    .demo-container {
+      display: flex;
+      height: 80vh; /* Use viewport height to ensure good sizing */
+      min-height: 600px; /* Minimum height */
+      border: 1px solid #ddd;
+      margin-top: 20px;
+      margin-bottom: 30px;
+    }
+
+    sketch-diff2-view {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h1>Sketch Monaco Diff View Demo</h1>
+
+  <div class="control-panel">
+    <p>This demonstrates the Monaco-based diff view with range and file pickers.</p>
+    <p>Using mock data to simulate the real API responses.</p>
+  </div>
+
+  <div class="demo-container">
+    <sketch-diff2-view></sketch-diff2-view>
+  </div>
+  
+
+</body>
+</html>

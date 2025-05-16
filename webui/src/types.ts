@@ -97,6 +97,21 @@ export interface MultipleChoiceParams {
 	responseOptions: MultipleChoiceOption[] | null;
 }
 
+export interface DiffFile {
+	path: string;
+	old_mode: string;
+	new_mode: string;
+	old_hash: string;
+	new_hash: string;
+	status: string;
+}
+
+export interface GitLogEntry {
+	hash: string;
+	refs: string[] | null;
+	subject: string;
+}
+
 export type CodingAgentMessageType = 'user' | 'agent' | 'error' | 'budget' | 'tool' | 'commit' | 'auto';
 
 export type Duration = number;

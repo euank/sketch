@@ -30,6 +30,7 @@
     "lit": "^3.2.1",
     "marked": "^15.0.7",
     "mermaid": "^11.6.0",
+    "monaco-editor": "^0.52.2",
     "sanitize-html": "^2.15.0"
   },
   "devDependencies": {

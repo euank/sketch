@@ -53,6 +53,7 @@ export class SketchTimeline extends LitElement {
       padding: 0 15px;
       box-sizing: border-box;
       overflow-x: hidden;
+      flex: 1;
     }
 
     /* Chat-like timeline styles */
@@ -69,6 +70,7 @@ export class SketchTimeline extends LitElement {
       overflow-x: hidden;
       padding-left: 1em;
       max-width: 100%;
+      width: 100%;
     }
     #jump-to-latest {
       display: none;
@@ -94,7 +96,8 @@ export class SketchTimeline extends LitElement {
     /* Welcome box styles for the empty chat state */
     .welcome-box {
       margin: 2rem auto;
-      max-width: 80%;
+      max-width: 90%;
+      width: 90%;
       padding: 2rem;
       border: 2px solid #e0e0e0;
       border-radius: 8px;

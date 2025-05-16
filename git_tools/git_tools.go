@@ -4,7 +4,9 @@ package git_tools
 import (
 	"bufio"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -17,9 +19,18 @@ type DiffFile struct {
 	NewHash string `json:"new_hash"`
 	Status  string `json:"status"` // A=added, M=modified, D=deleted, etc.
 } // GitRawDiff returns a structured representation of the Git diff between two commits or references
+// If 'to' is empty, it will show unstaged changes (diff with working directory)
 func GitRawDiff(repoDir, from, to string) ([]DiffFile, error) {
 	// Git command to generate the diff in raw format with full hashes
-	cmd := exec.Command("git", "-C", repoDir, "diff", "--raw", "--abbrev=40", from, to)
+	var cmd *exec.Cmd
+	if to == "" {
+		// If 'to' is empty, show unstaged changes
+		cmd = exec.Command("git", "-C", repoDir, "diff", "--raw", "--abbrev=40", from)
+	} else {
+		// Normal diff between two refs
+		cmd = exec.Command("git", "-C", repoDir, "diff", "--raw", "--abbrev=40", from, to)
+	}
+
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("error executing git diff: %w - %s", err, string(out))
@@ -87,15 +98,15 @@ func parseRawDiff(diffOutput string) ([]DiffFile, error) {
 	return files, nil
 }
 
-// LogEntry represents a single entry in the git log
-type LogEntry struct {
+// GitLogEntry represents a single entry in the git log
+type GitLogEntry struct {
 	Hash    string   `json:"hash"`    // The full commit hash
 	Refs    []string `json:"refs"`    // References (branches, tags) pointing to this commit
 	Subject string   `json:"subject"` // The commit subject/message
 }
 
 // GitRecentLog returns the recent commit log between the initial commit and HEAD
-func GitRecentLog(repoDir string, initialCommitHash string) ([]LogEntry, error) {
+func GitRecentLog(repoDir string, initialCommitHash string) ([]GitLogEntry, error) {
 	// Validate input
 	if initialCommitHash == "" {
 		return nil, fmt.Errorf("initial commit hash must be provided")
@@ -120,7 +131,7 @@ func GitRecentLog(repoDir string, initialCommitHash string) ([]LogEntry, error) 
 }
 
 // getGitLog gets the git log with the specified format using the provided fromCommit
-func getGitLog(repoDir string, fromCommit string) ([]LogEntry, error) {
+func getGitLog(repoDir string, fromCommit string) ([]GitLogEntry, error) {
 	// Check if fromCommit~10 exists (10 commits before fromCommit)
 	checkCmd := exec.Command("git", "-C", repoDir, "rev-parse", "--verify", fromCommit+"~10")
 	if err := checkCmd.Run(); err != nil {
@@ -144,8 +155,8 @@ func getGitLog(repoDir string, fromCommit string) ([]LogEntry, error) {
 }
 
 // parseGitLog parses the output of git log with null-separated fields
-func parseGitLog(logOutput string) ([]LogEntry, error) {
-	var entries []LogEntry
+func parseGitLog(logOutput string) ([]GitLogEntry, error) {
+	var entries []GitLogEntry
 	if logOutput == "" {
 		return entries, nil
 	}
@@ -165,7 +176,7 @@ func parseGitLog(logOutput string) ([]LogEntry, error) {
 		// Parse the refs from the decoration
 		refs := parseRefs(decoration)
 
-		entries = append(entries, LogEntry{
+		entries = append(entries, GitLogEntry{
 			Hash:    hash,
 			Refs:    refs,
 			Subject: subject,
@@ -227,4 +238,71 @@ func parseRefs(decoration string) []string {
 	}
 
 	return refs
+}
+
+// validateRepoPath verifies that a file is tracked by git and within the repository boundaries
+// Returns the full path to the file if valid
+func validateRepoPath(repoDir, filePath string) (string, error) {
+	// First verify that the requested file is tracked by git to prevent
+	// access to files outside the repository
+	cmd := exec.Command("git", "-C", repoDir, "ls-files", "--error-unmatch", filePath)
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("file not tracked by git or outside repository: %s", filePath)
+	}
+
+	// Construct the full file path
+	fullPath := filepath.Join(repoDir, filePath)
+
+	// Validate that the resolved path is still within the repository directory
+	// to prevent directory traversal attacks (e.g., ../../../etc/passwd)
+	absRepoDir, err := filepath.Abs(repoDir)
+	if err != nil {
+		return "", fmt.Errorf("unable to resolve absolute repository path: %w", err)
+	}
+
+	absFilePath, err := filepath.Abs(fullPath)
+	if err != nil {
+		return "", fmt.Errorf("unable to resolve absolute file path: %w", err)
+	}
+
+	// Check that the absolute file path starts with the absolute repository path
+	if !strings.HasPrefix(absFilePath, absRepoDir+string(filepath.Separator)) {
+		return "", fmt.Errorf("file path outside repository: %s", filePath)
+	}
+
+	return fullPath, nil
+}
+
+// GitCat returns the contents of a file in the repository at the given path
+// This is used to get the current working copy of a file (not using git show)
+func GitCat(repoDir, filePath string) (string, error) {
+	fullPath, err := validateRepoPath(repoDir, filePath)
+	if err != nil {
+		return "", err
+	}
+
+	// Read the file
+	content, err := os.ReadFile(fullPath)
+	if err != nil {
+		return "", fmt.Errorf("error reading file %s: %w", filePath, err)
+	}
+
+	return string(content), nil
+}
+
+// GitSaveFile saves content to a file in the repository, checking first that it's tracked by git
+// This prevents writing to files outside the repository
+func GitSaveFile(repoDir, filePath, content string) error {
+	fullPath, err := validateRepoPath(repoDir, filePath)
+	if err != nil {
+		return err
+	}
+
+	// Write the content to the file
+	err = os.WriteFile(fullPath, []byte(content), 0644)
+	if err != nil {
+		return fmt.Errorf("error writing to file %s: %w", filePath, err)
+	}
+
+	return nil
 }

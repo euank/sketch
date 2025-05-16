@@ -135,6 +135,8 @@ func New(agent loop.CodingAgent, logFile *os.File) (*Server, error) {
 	// Git tool endpoints
 	s.mux.HandleFunc("/git/rawdiff", s.handleGitRawDiff)
 	s.mux.HandleFunc("/git/show", s.handleGitShow)
+	s.mux.HandleFunc("/git/cat", s.handleGitCat)
+	s.mux.HandleFunc("/git/save", s.handleGitSave)
 	s.mux.HandleFunc("/git/recentlog", s.handleGitRecentLog)
 
 	s.mux.HandleFunc("/diff", func(w http.ResponseWriter, r *http.Request) {
@@ -1230,10 +1232,11 @@ func (s *Server) handleGitRawDiff(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if we have enough parameters
-	if from == "" || to == "" {
-		http.Error(w, "Missing required parameters: either 'commit' or both 'from' and 'to'", http.StatusBadRequest)
+	if from == "" {
+		http.Error(w, "Missing required parameter: either 'commit' or at least 'from'", http.StatusBadRequest)
 		return
 	}
+	// Note: 'to' can be empty to indicate working directory (unstaged changes)
 
 	// Call the git_tools function
 	diff, err := git_tools.GitRawDiff(repoDir, from, to)
@@ -1310,4 +1313,77 @@ func (s *Server) handleGitRecentLog(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error encoding response: %v", err), http.StatusInternalServerError)
 		return
 	}
+}
+
+func (s *Server) handleGitCat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get the git working directory from agent
+	repoDir := s.agent.WorkingDir()
+
+	// Parse query parameters
+	query := r.URL.Query()
+	path := query.Get("path")
+
+	// Check if path is provided
+	if path == "" {
+		http.Error(w, "Missing required parameter: path", http.StatusBadRequest)
+		return
+	}
+
+	// Get file content using GitCat
+	content, err := git_tools.GitCat(repoDir, path)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error reading file: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Return the content as JSON for consistency with other endpoints
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]string{"output": content}); err != nil {
+		http.Error(w, fmt.Sprintf("Error encoding response: %v", err), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) handleGitSave(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get the git working directory from agent
+	repoDir := s.agent.WorkingDir()
+
+	// Parse request body
+	var requestBody struct {
+		Path    string `json:"path"`
+		Content string `json:"content"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		http.Error(w, fmt.Sprintf("Error parsing request body: %v", err), http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// Check if path is provided
+	if requestBody.Path == "" {
+		http.Error(w, "Missing required parameter: path", http.StatusBadRequest)
+		return
+	}
+
+	// Save file content using GitSaveFile
+	err := git_tools.GitSaveFile(repoDir, requestBody.Path, requestBody.Content)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error saving file: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Return simple success response
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("ok"))
 }

@@ -121,6 +121,45 @@ func zipPath() (cacheDir, hashZip string, err error) {
 	return cacheDir, filepath.Join(cacheDir, "skui-"+hash+".zip"), nil
 }
 
+// copyMonacoAssets copies Monaco editor assets to the output directory
+func copyMonacoAssets(buildDir, outDir string) error {
+	// Create Monaco directories
+	monacoEditorDir := filepath.Join(outDir, "monaco", "min", "vs", "editor")
+	codiconDir := filepath.Join(outDir, "monaco", "min", "vs", "base", "browser", "ui", "codicons", "codicon")
+
+	if err := os.MkdirAll(monacoEditorDir, 0o777); err != nil {
+		return fmt.Errorf("failed to create monaco editor directory: %w", err)
+	}
+
+	if err := os.MkdirAll(codiconDir, 0o777); err != nil {
+		return fmt.Errorf("failed to create codicon directory: %w", err)
+	}
+
+	// Copy Monaco editor CSS
+	editorCssPath := "node_modules/monaco-editor/min/vs/editor/editor.main.css"
+	editorCss, err := os.ReadFile(filepath.Join(buildDir, editorCssPath))
+	if err != nil {
+		return fmt.Errorf("failed to read monaco editor CSS: %w", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(monacoEditorDir, "editor.main.css"), editorCss, 0o666); err != nil {
+		return fmt.Errorf("failed to write monaco editor CSS: %w", err)
+	}
+
+	// Copy Codicon font
+	codiconFontPath := "node_modules/monaco-editor/min/vs/base/browser/ui/codicons/codicon/codicon.ttf"
+	codiconFont, err := os.ReadFile(filepath.Join(buildDir, codiconFontPath))
+	if err != nil {
+		return fmt.Errorf("failed to read codicon font: %w", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(codiconDir, "codicon.ttf"), codiconFont, 0o666); err != nil {
+		return fmt.Errorf("failed to write codicon font: %w", err)
+	}
+
+	return nil
+}
+
 // Build unpacks and esbuild's all bundleTs typescript files
 func Build() (fs.FS, error) {
 	cacheDir, hashZip, err := zipPath()
@@ -163,11 +202,25 @@ func Build() (fs.FS, error) {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("npm ci: %s: %v", out, err)
 	}
-	bundleTs := []string{"src/web-components/sketch-app-shell.ts"}
+	bundleTs := []string{
+		"src/web-components/sketch-app-shell.ts",
+		"src/web-components/sketch-monaco-view.ts",
+		"node_modules/monaco-editor/esm/vs/editor/editor.worker.js",
+		"node_modules/monaco-editor/esm/vs/language/typescript/ts.worker.js",
+		"node_modules/monaco-editor/esm/vs/language/html/html.worker.js",
+		"node_modules/monaco-editor/esm/vs/language/css/css.worker.js",
+		"node_modules/monaco-editor/esm/vs/language/json/json.worker.js",
+	}
+
 	for _, tsName := range bundleTs {
 		if err := esbuildBundle(tmpHashDir, filepath.Join(buildDir, tsName), ""); err != nil {
 			return nil, fmt.Errorf("esbuild: %s: %w", tsName, err)
 		}
+	}
+
+	// Copy Monaco editor assets
+	if err := copyMonacoAssets(buildDir, tmpHashDir); err != nil {
+		return nil, fmt.Errorf("failed to copy Monaco assets: %w", err)
 	}
 
 	// Copy src files used directly into the new hash output dir.
@@ -283,6 +336,12 @@ func esbuildBundle(outDir, src, metafilePath string) error {
 		// Disable minification for now
 		// "--minify",
 		"--outdir=" + outDir,
+		"--loader:.ttf=file",
+		"--loader:.eot=file",
+		"--loader:.woff=file",
+		"--loader:.woff2=file",
+		// This changes where the sourcemap points to; we need relative dirs if we're proxied into a subdirectory.
+		"--public-path=.",
 	}
 
 	// Add metafile option if path is provided
@@ -358,7 +417,10 @@ func GenerateBundleMetafile(outputDir string) (string, error) {
 	}
 
 	// All bundles to analyze
-	bundleTs := []string{"src/web-components/sketch-app-shell.ts"}
+	bundleTs := []string{
+		"src/web-components/sketch-app-shell.ts",
+		"src/web-components/sketch-monaco-view.ts",
+	}
 	metafiles := make([]string, len(bundleTs))
 
 	for i, tsName := range bundleTs {

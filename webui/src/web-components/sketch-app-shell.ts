@@ -1,13 +1,17 @@
 import { css, html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { ConnectionStatus, DataManager } from "../data";
-import { AgentMessage, GitCommit, State } from "../types";
+import { AgentMessage, GitLogEntry, State } from "../types";
 import { aggregateAgentMessages } from "./aggregateAgentMessages";
 
 import "./sketch-chat-input";
 import "./sketch-container-status";
 import "./sketch-diff-view";
 import { SketchDiffView } from "./sketch-diff-view";
+import "./sketch-diff2-view";
+import { SketchDiff2View } from "./sketch-diff2-view";
+import { DefaultGitDataService } from "./git-data-service";
+import "./sketch-monaco-view";
 import "./sketch-network-status";
 import "./sketch-call-status";
 import "./sketch-terminal";
@@ -18,13 +22,13 @@ import "./sketch-restart-modal";
 import { createRef, ref } from "lit/directives/ref.js";
 import { SketchChatInput } from "./sketch-chat-input";
 
-type ViewMode = "chat" | "diff" | "terminal";
+type ViewMode = "chat" | "diff" | "diff2" | "terminal";
 
 @customElement("sketch-app-shell")
 export class SketchAppShell extends LitElement {
   // Current view mode (chat, diff, terminal)
   @state()
-  viewMode: "chat" | "diff" | "terminal" = "chat";
+  viewMode: ViewMode = "chat";
 
   // Current commit hash for diff view
   @state()
@@ -119,14 +123,21 @@ export class SketchAppShell extends LitElement {
       align-self: stretch;
       overflow-y: auto;
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0; /* Critical for proper flex child behavior */
     }
 
     #view-container-inner {
       max-width: 1200px;
+      width: calc(100% - 40px);
       margin: 0 auto;
       position: relative;
       padding-bottom: 10px;
       padding-top: 10px;
+      display: flex;
+      flex-direction: column;
+      height: 100%; /* Ensure it takes full height of parent */
     }
 
     #chat-input {
@@ -157,18 +168,44 @@ export class SketchAppShell extends LitElement {
       text-overflow: ellipsis;
     }
 
-    /* Allow the container to expand to full width in diff mode */
-    #view-container-inner.diff-active {
+    /* Allow the container to expand to full width and height in diff mode */
+    #view-container-inner.diff-active,
+    #view-container-inner.diff2-active {
       max-width: 100%;
       width: 100%;
+      height: 100%;
+      padding: 0; /* Remove padding for more space */
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0; /* Critical for flex behavior */
     }
 
     /* Individual view styles */
     .chat-view,
     .diff-view,
+    .diff2-view,
     .terminal-view {
       display: none; /* Hidden by default */
       width: 100%;
+      height: 100%;
+    }
+    
+    /* Make chat view take full width available */
+    .chat-view.view-active {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+    }
+    
+    /* Monaco diff2 view needs to take all available space */
+    .diff2-view.view-active {
+      flex: 1;
+      overflow: hidden;
+      min-height: 0; /* Required for proper flex child behavior */
+      display: flex;
+      flex-direction: column;
+      height: 100%;
     }
 
     /* Active view styles - these will be applied via JavaScript */
@@ -472,7 +509,7 @@ export class SketchAppShell extends LitElement {
     }
   }
 
-  updateUrlForViewMode(mode: "chat" | "diff" | "terminal"): void {
+  updateUrlForViewMode(mode: ViewMode): void {
     // Get the current URL without search parameters
     const url = new URL(window.location.href);
 
@@ -508,7 +545,7 @@ export class SketchAppShell extends LitElement {
    * Handle view mode selection event
    */
   private _handleViewModeSelect(event: CustomEvent) {
-    const mode = event.detail.mode as "chat" | "diff" | "terminal";
+    const mode = event.detail.mode as "chat" | "diff" | "diff2" | "terminal";
     this.toggleViewMode(mode, true);
   }
 
@@ -526,6 +563,11 @@ export class SketchAppShell extends LitElement {
     window.console.log("_handleMultipleChoice", event);
     this._sendChat;
   }
+
+  private _handleDiffComment(event: CustomEvent) {
+    // Empty stub required by the event binding in the template
+    // Actual handling occurs at global level in sketch-chat-input component
+  }
   /**
    * Listen for commit diff event
    * @param commitHash The commit hash to show diff for
@@ -534,16 +576,12 @@ export class SketchAppShell extends LitElement {
     // Store the commit hash
     this.currentCommitHash = commitHash;
 
-    // Switch to diff view
-    this.toggleViewMode("diff", true);
+    this.toggleViewMode("diff2", true);
 
-    // Wait for DOM update to complete
     this.updateComplete.then(() => {
-      // Get the diff view component
-      const diffView = this.shadowRoot?.querySelector("sketch-diff-view");
-      if (diffView) {
-        // Call the showCommitDiff method
-        (diffView as any).showCommitDiff(commitHash);
+      const diff2View = this.shadowRoot?.querySelector("sketch-diff2-view");
+      if (diff2View) {
+        (diff2View as SketchDiff2View).refreshDiffView();
       }
     });
   }
@@ -571,19 +609,25 @@ export class SketchAppShell extends LitElement {
       );
       const chatView = this.shadowRoot?.querySelector(".chat-view");
       const diffView = this.shadowRoot?.querySelector(".diff-view");
-
+      const diff2View = this.shadowRoot?.querySelector(".diff2-view");
       const terminalView = this.shadowRoot?.querySelector(".terminal-view");
 
       // Remove active class from all views
       chatView?.classList.remove("view-active");
       diffView?.classList.remove("view-active");
+      diff2View?.classList.remove("view-active");
       terminalView?.classList.remove("view-active");
 
       // Add/remove diff-active class on view container
       if (mode === "diff") {
         viewContainerInner?.classList.add("diff-active");
+        viewContainerInner?.classList.remove("diff2-active");
+      } else if (mode === "diff2") {
+        viewContainerInner?.classList.add("diff2-active");
+        viewContainerInner?.classList.remove("diff-active");
       } else {
         viewContainerInner?.classList.remove("diff-active");
+        viewContainerInner?.classList.remove("diff2-active");
       }
 
       // Add active class to the selected view
@@ -600,6 +644,16 @@ export class SketchAppShell extends LitElement {
             (diffViewComp as any).showCommitDiff(this.currentCommitHash);
           } else if (diffViewComp) {
             (diffViewComp as any).loadDiffContent();
+          }
+          break;
+          
+        case "diff2":
+          diff2View?.classList.add("view-active");
+          // Refresh git/recentlog when Monaco diff view is opened
+          // This ensures branch information is always up-to-date, as branches can change frequently
+          const diff2ViewComp = this.shadowRoot?.querySelector("sketch-diff2-view");
+          if (diff2ViewComp) {
+            (diff2ViewComp as SketchDiff2View).refreshDiffView();
           }
           break;
 
@@ -998,6 +1052,16 @@ export class SketchAppShell extends LitElement {
               .commitHash=${this.currentCommitHash}
             ></sketch-diff-view>
           </div>
+          
+          <div
+            class="diff2-view ${this.viewMode === "diff2" ? "view-active" : ""}"
+          >
+            <sketch-diff2-view
+              .commit=${this.currentCommitHash}
+              .gitService=${new DefaultGitDataService()}
+              @diff-comment="${this._handleDiffComment}"
+            ></sketch-diff2-view>
+          </div>
 
           <div
             class="terminal-view ${this.viewMode === "terminal"
@@ -1006,6 +1070,7 @@ export class SketchAppShell extends LitElement {
           >
             <sketch-terminal></sketch-terminal>
           </div>
+
         </div>
       </div>
 

@@ -363,3 +363,79 @@ func TestParseRefsEdgeCases(t *testing.T) {
 		})
 	}
 }
+
+func TestGitSaveFile(t *testing.T) {
+	// Create a temporary directory for the test repository
+	tmpDir, err := os.MkdirTemp("", "gitsave-test-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Initialize a git repository
+	cmd := exec.Command("git", "init")
+	cmd.Dir = tmpDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Failed to initialize git repo: %v, output: %s", err, output)
+	}
+
+	// Create and add a test file to the repo
+	testFilePath := "test-file.txt"
+	testFileContent := "initial content"
+	testFileFull := filepath.Join(tmpDir, testFilePath)
+
+	err = os.WriteFile(testFileFull, []byte(testFileContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	// Add the file to git
+	cmd = exec.Command("git", "add", testFilePath)
+	cmd.Dir = tmpDir
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Failed to add test file to git: %v, output: %s", err, output)
+	}
+
+	// Commit the file
+	cmd = exec.Command("git", "commit", "-m", "Initial commit")
+	cmd.Dir = tmpDir
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test",
+		"GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=Test",
+		"GIT_COMMITTER_EMAIL=test@example.com")
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Failed to commit test file: %v, output: %s", err, output)
+	}
+
+	// Test successful save
+	newContent := "updated content"
+	err = GitSaveFile(tmpDir, testFilePath, newContent)
+	if err != nil {
+		t.Errorf("GitSaveFile failed: %v", err)
+	}
+
+	// Verify the file was updated
+	content, err := os.ReadFile(testFileFull)
+	if err != nil {
+		t.Fatalf("Failed to read updated file: %v", err)
+	}
+	if string(content) != newContent {
+		t.Errorf("File content not updated correctly; got %q, want %q", string(content), newContent)
+	}
+
+	// Test saving a file outside the repo
+	err = GitSaveFile(tmpDir, "../outside.txt", "malicious content")
+	if err == nil {
+		t.Error("GitSaveFile should have rejected a path outside the repository")
+	}
+
+	// Test saving a file not tracked by git
+	err = GitSaveFile(tmpDir, "untracked.txt", "untracked content")
+	if err == nil {
+		t.Error("GitSaveFile should have rejected an untracked file")
+	}
+}

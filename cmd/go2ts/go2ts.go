@@ -12,6 +12,7 @@ import (
 	"os"
 
 	"go.skia.org/infra/go/go2ts"
+	"sketch.dev/git_tools"
 	"sketch.dev/llm"
 	"sketch.dev/loop"
 	"sketch.dev/loop/server"
@@ -58,6 +59,8 @@ func TS() *go2ts.Go2TS {
 		server.State{},
 		loop.MultipleChoiceOption{},
 		loop.MultipleChoiceParams{},
+		git_tools.DiffFile{},
+		git_tools.GitLogEntry{},
 	)
 
 	generator.GenerateNominalTypes = true
