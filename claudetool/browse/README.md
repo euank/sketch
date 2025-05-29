@@ -35,6 +35,8 @@ for _, tool := range tools {
 ## Requirements
 
 - Chrome or Chromium must be installed on the system
+- In Docker environments, the multi-stage build automatically provides headless-shell from chromedp/headless-shell
+- For local development, install Chrome/Chromium manually
 - The `chromedp` package handles launching and controlling the browser
 
 ## Tool Input/Output
