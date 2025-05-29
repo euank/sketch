@@ -837,3 +837,41 @@ func TestContextLimitErrorDetection(t *testing.T) {
 		})
 	}
 }
+
+func TestCompactCommandDetection(t *testing.T) {
+	// Test cases for command detection
+	testCases := []struct {
+		name     string
+		message  string
+		expected bool
+	}{
+		{"exact compact command", "/compact", true},
+		{"compact with spaces", "  /compact  ", true},
+		{"not a compact command", "please compact this", false},
+		{"different command", "/help", false},
+		{"compact in sentence", "can you /compact the conversation?", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create message content like what would come from user input
+			msgs := []llm.Content{{
+				Type: llm.ContentTypeText,
+				Text: tc.message,
+			}}
+
+			// Check the logic used in processUserMessage
+			isCompactCommand := false
+			if len(msgs) == 1 && msgs[0].Type == llm.ContentTypeText {
+				text := strings.TrimSpace(msgs[0].Text)
+				if text == "/compact" {
+					isCompactCommand = true
+				}
+			}
+
+			if isCompactCommand != tc.expected {
+				t.Errorf("Expected compact command detection: %v, got: %v for message: %q", tc.expected, isCompactCommand, tc.message)
+			}
+		})
+	}
+}

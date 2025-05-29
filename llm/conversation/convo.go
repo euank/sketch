@@ -666,6 +666,9 @@ func (c *Convo) Compact() int {
 					bytesCompacted += len(content.Text)
 					content.Text = "<compacted away>"
 				}
+				// Convert to plain text content to avoid confusion
+				content.MediaType = ""
+				content.Type = llm.ContentTypeText
 			}
 		}
 	}
@@ -703,6 +706,9 @@ func (c *Convo) compactToolResult(content *llm.Content) int {
 				bytesCompacted += len(nestedContent.Text)
 				nestedContent.Text = "<compacted away>"
 			}
+			// Convert to plain text content to avoid confusion
+			nestedContent.MediaType = ""
+			nestedContent.Type = llm.ContentTypeText
 		}
 
 		// Recursively handle nested tool results

@@ -484,6 +484,34 @@ func (a *Agent) CompactConversation() int {
 	return 0
 }
 
+// handleCompactCommand handles the /compact command and returns a synthetic response
+func (a *Agent) handleCompactCommand(ctx context.Context) (*llm.Response, error) {
+	a.stateMachine.Transition(ctx, StateProcessingLLMResponse, "Processing compact command")
+
+	bytesCompacted := a.CompactConversation()
+
+	var responseText string
+	if bytesCompacted > 0 {
+		responseText = fmt.Sprintf("🗜️ Compacted %d bytes from conversation history. Large tool responses and images have been replaced with placeholders.", bytesCompacted)
+	} else {
+		responseText = "🗜️ No content was compacted - conversation is already optimized."
+	}
+
+	// Create a synthetic response that looks like it came from the LLM
+	// This allows the normal flow to continue without special handling
+	response := &llm.Response{
+		ID:         "compact-" + fmt.Sprintf("%d", time.Now().UnixNano()),
+		Type:       "message",
+		Role:       llm.MessageRoleAssistant,
+		Model:      "compact-command",
+		Content:    []llm.Content{{Type: llm.ContentTypeText, Text: responseText}},
+		StopReason: llm.StopReasonEndTurn,
+		Usage:      llm.Usage{}, // No tokens used for this synthetic response
+	}
+
+	return response, nil
+}
+
 func (a *Agent) URL() string { return a.url }
 
 // Title returns the current title of the conversation.
@@ -1372,6 +1400,14 @@ func (a *Agent) processUserMessage(ctx context.Context) (*llm.Response, error) {
 	if err != nil { // e.g. the context was canceled while blocking in GatherMessages
 		a.stateMachine.Transition(ctx, StateError, "Error gathering messages: "+err.Error())
 		return nil, err
+	}
+
+	// Check for special commands before processing as normal user message
+	if len(msgs) == 1 && msgs[0].Type == llm.ContentTypeText {
+		text := strings.TrimSpace(msgs[0].Text)
+		if text == "/compact" {
+			return a.handleCompactCommand(ctx)
+		}
 	}
 
 	userMessage := llm.Message{
