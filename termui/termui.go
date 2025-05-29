@@ -215,6 +215,7 @@ Special commands:
 - usage, cost         : Show current token usage and cost
 - browser, open, b    : Open current conversation in browser
 - stop, cancel, abort : Cancel the current operation
+- compact             : Compress conversation history to reduce context size
 - exit, quit, q       : Exit sketch
 - ! <command>         : Execute a shell command (e.g. !ls -la)`)
 		case "budget":
@@ -296,6 +297,9 @@ Special commands:
 			return nil
 		case "stop", "cancel", "abort":
 			ui.agent.CancelTurn(fmt.Errorf("user canceled the operation"))
+		case "compact":
+			// Call the compact method on the agent's conversation
+			ui.handleCompactCommand()
 		case "panic":
 			panic("user forced a panic")
 		default:
@@ -446,6 +450,27 @@ func (ui *TermUI) AppendChatMessage(msg chatMessage) {
 func (ui *TermUI) AppendSystemMessage(fmtString string, args ...any) {
 	ui.messageWaitGroup.Add(1)
 	ui.termLogCh <- fmt.Sprintf(fmtString, args...)
+}
+
+// handleCompactCommand handles the /compact command by calling the conversation's Compact method
+func (ui *TermUI) handleCompactCommand() {
+	// We need to access the conversation's Compact method. Since the agent interface doesn't expose
+	// the underlying conversation directly, we need to add a method to the CodingAgent interface.
+	// For now, we'll use a type assertion to access the conversation.
+	type ConversationCompactor interface {
+		CompactConversation() int
+	}
+
+	if compactor, ok := ui.agent.(ConversationCompactor); ok {
+		bytesCompacted := compactor.CompactConversation()
+		if bytesCompacted > 0 {
+			ui.AppendSystemMessage("🗜️ Compacted %d bytes from conversation history. Large tool responses and images have been replaced with placeholders.", bytesCompacted)
+		} else {
+			ui.AppendSystemMessage("🗜️ No content was compacted - conversation is already optimized.")
+		}
+	} else {
+		ui.AppendSystemMessage("❌ Compact feature not available for this agent type.")
+	}
 }
 
 // getShortSHA returns the short SHA for the given git reference, falling back to the original SHA on error.

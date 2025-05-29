@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"sketch.dev/httprr"
+	"sketch.dev/llm"
 	"sketch.dev/llm/ant"
 )
 
@@ -135,5 +136,101 @@ func TestCancelToolUse(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+type mockService struct{}
+
+func (m *mockService) Do(ctx context.Context, req *llm.Request) (*llm.Response, error) {
+	return nil, nil // Not needed for this test
+}
+
+func TestCompact(t *testing.T) {
+	mockSvc := &mockService{}
+	convo := New(context.Background(), mockSvc)
+
+	// Create messages with tool results of various sizes
+	messages := []llm.Message{
+		// Message with short tool result (should not be compacted)
+		{
+			Role: llm.MessageRoleAssistant,
+			Content: []llm.Content{
+				{
+					Type: llm.ContentTypeToolResult,
+					Text: "short result",
+					ToolResult: []llm.Content{{
+						Type: llm.ContentTypeText,
+						Text: "short text",
+					}},
+				},
+			},
+		},
+		// Message with long tool result (should be compacted)
+		{
+			Role: llm.MessageRoleAssistant,
+			Content: []llm.Content{
+				{
+					Type: llm.ContentTypeToolResult,
+					Text: strings.Repeat("a", 200), // 200 bytes, > 100 threshold
+					ToolResult: []llm.Content{{
+						Type: llm.ContentTypeText,
+						Text: strings.Repeat("b", 150), // 150 bytes, > 100 threshold
+					}},
+				},
+			},
+		},
+		// Message with image content (should be compacted)
+		{
+			Role: llm.MessageRoleUser,
+			Content: []llm.Content{
+				{
+					Type:      llm.ContentTypeText,
+					Text:      "Original image text",
+					MediaType: "image/jpeg",
+					Data:      "base64imagedata123456789",
+				},
+			},
+		},
+	}
+
+	// Add messages to conversation manually
+	convo.messages = messages
+
+	// Compact the conversation
+	bytesCompacted := convo.Compact()
+
+	// Verify that bytes were compacted
+	if bytesCompacted == 0 {
+		t.Errorf("Expected some bytes to be compacted, got 0")
+	}
+
+	// Check that large tool result text was compacted
+	if convo.messages[1].Content[0].Text != "<compacted away>" {
+		t.Errorf("Expected large tool result text to be compacted, got: %s", convo.messages[1].Content[0].Text)
+	}
+
+	// Check that nested tool result text was compacted
+	if convo.messages[1].Content[0].ToolResult[0].Text != "<compacted away>" {
+		t.Errorf("Expected large nested tool result text to be compacted, got: %s", convo.messages[1].Content[0].ToolResult[0].Text)
+	}
+
+	// Check that short tool result was NOT compacted
+	if convo.messages[0].Content[0].Text == "<compacted away>" {
+		t.Errorf("Expected short tool result text to NOT be compacted")
+	}
+
+	// Check that image data was compacted
+	if convo.messages[2].Content[0].Data != "" {
+		t.Errorf("Expected image data to be compacted, still has data: %s", convo.messages[2].Content[0].Data)
+	}
+
+	// Check that image text was compacted
+	if convo.messages[2].Content[0].Text != "<compacted away>" {
+		t.Errorf("Expected image text to be compacted, got: %s", convo.messages[2].Content[0].Text)
+	}
+
+	// Verify that short text was NOT compacted
+	if convo.messages[0].Content[0].ToolResult[0].Text == "<compacted away>" {
+		t.Errorf("Expected short nested tool result text to NOT be compacted")
 	}
 }

@@ -795,3 +795,45 @@ func TestPushToOutbox(t *testing.T) {
 		t.Errorf("Expected Content to be %q, got %q", expected, received.Content)
 	}
 }
+
+func TestContextLimitErrorDetection(t *testing.T) {
+	// Test cases for context limit error detection
+	testCases := []struct {
+		name           string
+		errorMessage   string
+		expectsCompact bool
+	}{
+		{
+			name:           "Context limit error",
+			errorMessage:   "status 400 Bad Request: {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"input length and max_tokens exceed context limit: 196908 + 8192 > 200000, decrease input length or max_tokens and try again\"}}",
+			expectsCompact: true,
+		},
+		{
+			name:           "Different status 400 error",
+			errorMessage:   "status 400 Bad Request: {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"some other error\"}}",
+			expectsCompact: false,
+		},
+		{
+			name:           "Context limit error with different numbers",
+			errorMessage:   "status 400 Bad Request: something input length and max_tokens exceed context limit: 150000 + 8192 > 200000",
+			expectsCompact: true,
+		},
+		{
+			name:           "Unrelated error",
+			errorMessage:   "network error: connection timeout",
+			expectsCompact: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := fmt.Errorf("%s", tc.errorMessage)
+			msg := errorMessage(err)
+
+			containsCompactSuggestion := strings.Contains(msg.Content, "/compact")
+			if containsCompactSuggestion != tc.expectsCompact {
+				t.Errorf("Expected compact suggestion: %v, got: %v\nError message: %s", tc.expectsCompact, containsCompactSuggestion, msg.Content)
+			}
+		})
+	}
+}

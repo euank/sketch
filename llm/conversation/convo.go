@@ -640,3 +640,76 @@ func (c *Convo) overBudget() error {
 	}
 	return err
 }
+
+// Compact reduces the size of the conversation by replacing large tool responses and images with placeholders.
+// It returns the number of bytes that were compacted.
+func (c *Convo) Compact() int {
+	bytesCompacted := 0
+
+	for i := range c.messages {
+		msg := &c.messages[i]
+		for j := range msg.Content {
+			content := &msg.Content[j]
+
+			// Handle tool results
+			if content.Type == llm.ContentTypeToolResult {
+				bytesCompacted += c.compactToolResult(content)
+			}
+
+			// Handle images in content
+			if content.MediaType != "" && (content.MediaType == "image/jpeg" || content.MediaType == "image/png") {
+				if content.Data != "" {
+					bytesCompacted += len(content.Data)
+					content.Data = ""
+				}
+				if content.Text != "<compacted away>" {
+					bytesCompacted += len(content.Text)
+					content.Text = "<compacted away>"
+				}
+			}
+		}
+	}
+
+	return bytesCompacted
+}
+
+// compactToolResult compacts a tool result content if it's longer than 100 bytes
+func (c *Convo) compactToolResult(content *llm.Content) int {
+	bytesCompacted := 0
+
+	// Compact the main text if it's longer than 100 bytes
+	if len(content.Text) > 100 {
+		bytesCompacted += len(content.Text) - len("<compacted away>")
+		content.Text = "<compacted away>"
+	}
+
+	// Recursively compact nested tool results
+	for i := range content.ToolResult {
+		nestedContent := &content.ToolResult[i]
+
+		// Compact text content if it's longer than 100 bytes
+		if nestedContent.Type == llm.ContentTypeText && len(nestedContent.Text) > 100 {
+			bytesCompacted += len(nestedContent.Text) - len("<compacted away>")
+			nestedContent.Text = "<compacted away>"
+		}
+
+		// Handle images in nested content
+		if nestedContent.MediaType != "" && (nestedContent.MediaType == "image/jpeg" || nestedContent.MediaType == "image/png") {
+			if nestedContent.Data != "" {
+				bytesCompacted += len(nestedContent.Data)
+				nestedContent.Data = ""
+			}
+			if nestedContent.Text != "<compacted away>" {
+				bytesCompacted += len(nestedContent.Text)
+				nestedContent.Text = "<compacted away>"
+			}
+		}
+
+		// Recursively handle nested tool results
+		if nestedContent.Type == llm.ContentTypeToolResult {
+			bytesCompacted += c.compactToolResult(nestedContent)
+		}
+	}
+
+	return bytesCompacted
+}

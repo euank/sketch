@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"slices"
 	"strings"
@@ -126,6 +127,9 @@ type CodingAgent interface {
 	FirstMessageIndex() int
 
 	CurrentStateName() string
+
+	// CompactConversation compacts the conversation history and returns bytes compacted
+	CompactConversation() int
 }
 
 type CodingAgentMessageType string
@@ -268,13 +272,27 @@ func (a *AgentMessage) Attr() slog.Attr {
 	return slog.Group("agent_message", attrs...)
 }
 
+// contextLimitErrorPattern matches the specific context limit error from Anthropic
+var contextLimitErrorPattern = regexp.MustCompile(`status 400 Bad Request.*input length and max_tokens exceed context limit`)
+
 func errorMessage(err error) AgentMessage {
 	// It's somewhat unknowable whether error messages are "end of turn" or not, but it seems like the best approach.
-	if os.Getenv(("DEBUG")) == "1" {
-		return AgentMessage{Type: ErrorMessageType, Content: err.Error() + " Stacktrace: " + string(debug.Stack()), EndOfTurn: true}
+	errStr := err.Error()
+
+	// Check if this is a context limit error and suggest compaction
+	if contextLimitErrorPattern.MatchString(errStr) {
+		errorContent := errStr + "\n\nThis conversation has grown too large for the LLM's context window. You can type '/compact' to compress the conversation history by removing large tool responses and images, then try again."
+		if os.Getenv(("DEBUG")) == "1" {
+			errorContent += " Stacktrace: " + string(debug.Stack())
+		}
+		return AgentMessage{Type: ErrorMessageType, Content: errorContent, EndOfTurn: true}
 	}
 
-	return AgentMessage{Type: ErrorMessageType, Content: err.Error(), EndOfTurn: true}
+	if os.Getenv(("DEBUG")) == "1" {
+		return AgentMessage{Type: ErrorMessageType, Content: errStr + " Stacktrace: " + string(debug.Stack()), EndOfTurn: true}
+	}
+
+	return AgentMessage{Type: ErrorMessageType, Content: errStr, EndOfTurn: true}
 }
 
 func budgetMessage(err error) AgentMessage {
@@ -455,6 +473,15 @@ func (a *Agent) CurrentStateName() string {
 		return ""
 	}
 	return a.stateMachine.CurrentState().String()
+}
+
+// CompactConversation implements CodingAgent.
+func (a *Agent) CompactConversation() int {
+	// Type assert to access the underlying conversation.Convo's Compact method
+	if convo, ok := a.convo.(*conversation.Convo); ok {
+		return convo.Compact()
+	}
+	return 0
 }
 
 func (a *Agent) URL() string { return a.url }
