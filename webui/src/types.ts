@@ -104,6 +104,8 @@ export interface DiffFile {
 	old_hash: string;
 	new_hash: string;
 	status: string;
+	additions: number;
+	deletions: number;
 }
 
 export interface GitLogEntry {

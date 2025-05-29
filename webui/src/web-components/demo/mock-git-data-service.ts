@@ -45,6 +45,8 @@ export class MockGitDataService implements GitDataService {
       old_mode: "000000",
       old_hash: "0000000000000000000000000000000000000000",
       new_hash: "def0123456789abcdef0123456789abcdef0123",
+      additions: 54,
+      deletions: 0,
     },
     {
       path: "src/components/RangePicker.js",
@@ -53,6 +55,8 @@ export class MockGitDataService implements GitDataService {
       old_mode: "000000",
       old_hash: "0000000000000000000000000000000000000000",
       new_hash: "cde0123456789abcdef0123456789abcdef0123",
+      additions: 32,
+      deletions: 0,
     },
     {
       path: "src/components/App.js",
@@ -61,6 +65,8 @@ export class MockGitDataService implements GitDataService {
       old_mode: "100644",
       old_hash: "abc0123456789abcdef0123456789abcdef0123",
       new_hash: "bcd0123456789abcdef0123456789abcdef0123",
+      additions: 15,
+      deletions: 3,
     },
     {
       path: "src/styles/main.css",
@@ -69,6 +75,8 @@ export class MockGitDataService implements GitDataService {
       old_mode: "100644",
       old_hash: "fgh0123456789abcdef0123456789abcdef0123",
       new_hash: "ghi0123456789abcdef0123456789abcdef0123",
+      additions: 25,
+      deletions: 8,
     },
   ];
 
@@ -395,7 +403,7 @@ button {
     // to simulate unstaged changes
     return this.mockDiffFiles.map((file) => ({
       ...file,
-      newHash: "0000000000000000000000000000000000000000",
+      new_hash: "0000000000000000000000000000000000000000",
     }));
   }
 

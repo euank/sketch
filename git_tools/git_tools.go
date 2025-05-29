@@ -13,32 +13,43 @@ import (
 
 // DiffFile represents a file in a Git diff
 type DiffFile struct {
-	Path    string `json:"path"`
-	OldMode string `json:"old_mode"`
-	NewMode string `json:"new_mode"`
-	OldHash string `json:"old_hash"`
-	NewHash string `json:"new_hash"`
-	Status  string `json:"status"` // A=added, M=modified, D=deleted, etc.
+	Path      string `json:"path"`
+	OldMode   string `json:"old_mode"`
+	NewMode   string `json:"new_mode"`
+	OldHash   string `json:"old_hash"`
+	NewHash   string `json:"new_hash"`
+	Status    string `json:"status"`    // A=added, M=modified, D=deleted, etc.
+	Additions int    `json:"additions"` // Number of lines added
+	Deletions int    `json:"deletions"` // Number of lines deleted
 } // GitRawDiff returns a structured representation of the Git diff between two commits or references
 // If 'to' is empty, it will show unstaged changes (diff with working directory)
 func GitRawDiff(repoDir, from, to string) ([]DiffFile, error) {
-	// Git command to generate the diff in raw format with full hashes
-	var cmd *exec.Cmd
+	// Git command to generate the diff in raw format with full hashes and numstat
+	var rawCmd, numstatCmd *exec.Cmd
 	if to == "" {
 		// If 'to' is empty, show unstaged changes
-		cmd = exec.Command("git", "-C", repoDir, "diff", "--raw", "--abbrev=40", from)
+		rawCmd = exec.Command("git", "-C", repoDir, "diff", "--raw", "--abbrev=40", from)
+		numstatCmd = exec.Command("git", "-C", repoDir, "diff", "--numstat", from)
 	} else {
 		// Normal diff between two refs
-		cmd = exec.Command("git", "-C", repoDir, "diff", "--raw", "--abbrev=40", from, to)
+		rawCmd = exec.Command("git", "-C", repoDir, "diff", "--raw", "--abbrev=40", from, to)
+		numstatCmd = exec.Command("git", "-C", repoDir, "diff", "--numstat", from, to)
 	}
 
-	out, err := cmd.CombinedOutput()
+	// Execute raw diff command
+	rawOut, err := rawCmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("error executing git diff: %w - %s", err, string(out))
+		return nil, fmt.Errorf("error executing git diff --raw: %w - %s", err, string(rawOut))
+	}
+
+	// Execute numstat command
+	numstatOut, err := numstatCmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("error executing git diff --numstat: %w - %s", err, string(numstatOut))
 	}
 
 	// Parse the raw diff output into structured format
-	return parseRawDiff(string(out))
+	return parseRawDiffWithNumstat(string(rawOut), string(numstatOut))
 }
 
 // GitShow returns the result of git show for a specific commit hash
@@ -49,6 +60,58 @@ func GitShow(repoDir, hash string) (string, error) {
 		return "", fmt.Errorf("error executing git show: %w - %s", err, string(out))
 	}
 	return string(out), nil
+}
+
+// parseRawDiffWithNumstat converts git diff --raw and --numstat output into structured format
+func parseRawDiffWithNumstat(rawOutput, numstatOutput string) ([]DiffFile, error) {
+	// First parse the raw diff to get the base file information
+	files, err := parseRawDiff(rawOutput)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a map to store numstat data by file path
+	numstatMap := make(map[string]struct{ additions, deletions int })
+
+	// Parse numstat output
+	if numstatOutput != "" {
+		scanner := bufio.NewScanner(strings.NewReader(strings.TrimSpace(numstatOutput)))
+		for scanner.Scan() {
+			line := scanner.Text()
+			// Format: additions\tdeletions\tfilename
+			// Example: 5\t3\tpath/to/file.go
+			parts := strings.Split(line, "\t")
+			if len(parts) >= 3 {
+				additions := 0
+				deletions := 0
+
+				// Handle binary files (marked with "-")
+				if parts[0] != "-" {
+					if add, err := fmt.Sscanf(parts[0], "%d", &additions); err != nil || add != 1 {
+						additions = 0
+					}
+				}
+				if parts[1] != "-" {
+					if del, err := fmt.Sscanf(parts[1], "%d", &deletions); err != nil || del != 1 {
+						deletions = 0
+					}
+				}
+
+				filePath := strings.Join(parts[2:], "\t") // Handle filenames with tabs
+				numstatMap[filePath] = struct{ additions, deletions int }{additions, deletions}
+			}
+		}
+	}
+
+	// Merge numstat data into files
+	for i := range files {
+		if stats, found := numstatMap[files[i].Path]; found {
+			files[i].Additions = stats.additions
+			files[i].Deletions = stats.deletions
+		}
+	}
+
+	return files, nil
 }
 
 // parseRawDiff converts git diff --raw output into structured format
@@ -87,12 +150,14 @@ func parseRawDiff(diffOutput string) ([]DiffFile, error) {
 		}
 
 		files = append(files, DiffFile{
-			Path:    path,
-			OldMode: oldMode,
-			NewMode: newMode,
-			OldHash: oldHash,
-			NewHash: newHash,
-			Status:  status,
+			Path:      path,
+			OldMode:   oldMode,
+			NewMode:   newMode,
+			OldHash:   oldHash,
+			NewHash:   newHash,
+			Status:    status,
+			Additions: 0, // Will be filled by numstat data
+			Deletions: 0, // Will be filled by numstat data
 		})
 	}
 

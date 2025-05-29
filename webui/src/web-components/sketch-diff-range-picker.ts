@@ -128,6 +128,31 @@ export class SketchDiffRangePicker extends LitElement {
       font-size: 14px;
     }
 
+    .refresh-button {
+      padding: 6px 12px;
+      background-color: #f0f0f0;
+      color: var(--text-color, #333);
+      border: 1px solid var(--border-color, #e0e0e0);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .refresh-button:hover {
+      background-color: #e0e0e0;
+    }
+
+    .refresh-button:disabled {
+      background-color: #f8f8f8;
+      color: #999;
+      cursor: not-allowed;
+    }
+
     @media (max-width: 768px) {
       .commit-selector {
         max-width: 100%;
@@ -189,6 +214,15 @@ export class SketchDiffRangePicker extends LitElement {
           ? this.renderRangeSelectors()
           : this.renderSingleSelector()}
       </div>
+
+      <button
+        class="refresh-button"
+        @click="${this.handleRefresh}"
+        ?disabled="${this.loading}"
+        title="Refresh commit list"
+      >
+        🔄 Refresh
+      </button>
     `;
   }
 
@@ -357,6 +391,13 @@ export class SketchDiffRangePicker extends LitElement {
     const select = event.target as HTMLSelectElement;
     this.singleCommit = select.value;
     this.dispatchRangeEvent();
+  }
+
+  /**
+   * Handle refresh button click
+   */
+  handleRefresh() {
+    this.loadCommits();
   }
 
   /**

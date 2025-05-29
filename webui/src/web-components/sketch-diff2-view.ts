@@ -159,11 +159,16 @@ export class SketchDiff2View extends LitElement {
       background-color: #f0f0f0;
       border: 1px solid #ccc;
       border-radius: 4px;
-      padding: 6px 12px;
-      font-size: 12px;
+      padding: 8px;
+      font-size: 16px;
       cursor: pointer;
       white-space: nowrap;
       transition: background-color 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 36px;
+      min-height: 36px;
     }
 
     .view-toggle-button:hover {
@@ -316,30 +321,14 @@ export class SketchDiff2View extends LitElement {
             ></sketch-diff-file-picker>
 
             <div style="display: flex; gap: 8px;">
-              ${this.isRightEditable
-                ? html`
-                    <div
-                      class="editable-indicator"
-                      title="This file is editable"
-                    >
-                      <span
-                        style="padding: 6px 12px; background-color: #e9ecef; border-radius: 4px; font-size: 12px; color: #495057;"
-                      >
-                        Editable
-                      </span>
-                    </div>
-                  `
-                : ""}
               <button
                 class="view-toggle-button"
                 @click="${this.toggleHideUnchangedRegions}"
                 title="${this.hideUnchangedRegionsEnabled
-                  ? "Expand All"
-                  : "Hide Unchanged"}"
+                  ? "Expand All: Show all lines including unchanged regions"
+                  : "Collapse Expanded Lines: Hide unchanged regions to focus on changes"}"
               >
-                ${this.hideUnchangedRegionsEnabled
-                  ? "Expand All"
-                  : "Hide Unchanged"}
+                ${this.hideUnchangedRegionsEnabled ? this.renderExpandAllIcon() : this.renderCollapseIcon()}
               </button>
             </div>
           </div>
@@ -547,6 +536,38 @@ export class SketchDiff2View extends LitElement {
     const file = event.detail.file as GitDiffFile;
     this.selectedFilePath = file.path;
     this.loadFileContent(file);
+  }
+
+  /**
+   * Render expand all icon (dotted line with arrows pointing away)
+   */
+  renderExpandAllIcon() {
+    return html`
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <!-- Dotted line in the middle -->
+        <line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" stroke-width="1" stroke-dasharray="2,1"/>
+        <!-- Large arrow pointing up -->
+        <path d="M8 2 L5 6 L11 6 Z" fill="currentColor"/>
+        <!-- Large arrow pointing down -->
+        <path d="M8 14 L5 10 L11 10 Z" fill="currentColor"/>
+      </svg>
+    `;
+  }
+
+  /**
+   * Render collapse icon (arrows pointing towards dotted line)
+   */
+  renderCollapseIcon() {
+    return html`
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <!-- Dotted line in the middle -->
+        <line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" stroke-width="1" stroke-dasharray="2,1"/>
+        <!-- Large arrow pointing down towards line -->
+        <path d="M8 6 L5 2 L11 2 Z" fill="currentColor"/>
+        <!-- Large arrow pointing up towards line -->
+        <path d="M8 10 L5 14 L11 14 Z" fill="currentColor"/>
+      </svg>
+    `;
   }
 
   /**

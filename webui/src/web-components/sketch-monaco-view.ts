@@ -196,6 +196,10 @@ export class CodeDiffEditor extends LitElement {
       transition: opacity 0.3s ease;
     }
 
+    .save-indicator.idle {
+      background-color: #6c757d;
+    }
+
     .save-indicator.modified {
       background-color: #f0ad4e;
     }
@@ -374,16 +378,18 @@ export class CodeDiffEditor extends LitElement {
       <main ${ref(this.container)}></main>
 
       <!-- Save indicator - shown when editing -->
-      ${this.editableRight && this.saveState !== "idle"
+      ${this.editableRight
         ? html`
             <div class="save-indicator ${this.saveState}">
-              ${this.saveState === "modified"
-                ? "Modified..."
-                : this.saveState === "saving"
-                  ? "Saving..."
-                  : this.saveState === "saved"
-                    ? "Saved"
-                    : ""}
+              ${this.saveState === "idle"
+                ? "Editable"
+                : this.saveState === "modified"
+                  ? "Modified..."
+                  : this.saveState === "saving"
+                    ? "Saving..."
+                    : this.saveState === "saved"
+                      ? "Saved"
+                      : ""}
             </div>
           `
         : ""}
