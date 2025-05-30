@@ -14,6 +14,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/kevinburke/ssh_config v1.2.0
 	github.com/oklog/ulid/v2 v2.1.0
+	github.com/peterbourgon/ff/v3 v3.4.0
 	github.com/pkg/sftp v1.13.9
 	github.com/richardlehane/crock32 v1.0.1
 	github.com/sashabaranov/go-openai v1.38.2
