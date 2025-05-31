@@ -244,6 +244,7 @@ Special commands:
 - usage, cost         : Show current token usage and cost
 - browser, open, b    : Open current conversation in browser
 - stop, cancel, abort : Cancel the current operation
+- compact             : Compact conversation to manage token limits
 - exit, quit, q       : Exit sketch
 - ! <command>         : Execute a shell command (e.g. !ls -la)`)
 		case "budget":
@@ -325,6 +326,9 @@ Special commands:
 			return nil
 		case "stop", "cancel", "abort":
 			ui.agent.CancelTurn(fmt.Errorf("user canceled the operation"))
+		case "compact":
+			// Send /compact message to agent
+			ui.agent.UserMessage(ctx, "/compact")
 		case "panic":
 			panic("user forced a panic")
 		default:

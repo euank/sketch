@@ -128,6 +128,10 @@ type CodingAgent interface {
 	CurrentStateName() string
 	// CurrentTodoContent returns the current todo list data as JSON, or empty string if no todos exist
 	CurrentTodoContent() string
+
+	// CompactConversation compacts the current conversation by generating a summary
+	// and restarting the conversation with that summary as the initial context
+	CompactConversation(ctx context.Context) error
 }
 
 type CodingAgentMessageType string
@@ -138,8 +142,9 @@ const (
 	ErrorMessageType   CodingAgentMessageType = "error"
 	BudgetMessageType  CodingAgentMessageType = "budget" // dedicated for "out of budget" errors
 	ToolUseMessageType CodingAgentMessageType = "tool"
-	CommitMessageType  CodingAgentMessageType = "commit" // for displaying git commits
-	AutoMessageType    CodingAgentMessageType = "auto"   // for automated notifications like autoformatting
+	CommitMessageType  CodingAgentMessageType = "commit"  // for displaying git commits
+	AutoMessageType    CodingAgentMessageType = "auto"    // for automated notifications like autoformatting
+	CompactMessageType CodingAgentMessageType = "compact" // for conversation compaction notifications
 
 	cancelToolUseMessage = "Stop responding to my previous message. Wait for me to ask you something else before attempting to use any more tools."
 )
@@ -356,6 +361,9 @@ type Agent struct {
 	// read from by GatherMessages
 	inbox chan string
 
+	// Flag to indicate that compaction is pending
+	pendingCompaction bool
+
 	// protects cancelTurn
 	cancelTurnMu sync.Mutex
 	// cancels potentially long-running tool_use calls or chains of them
@@ -471,6 +479,88 @@ func (a *Agent) CurrentTodoContent() string {
 		return ""
 	}
 	return string(content)
+}
+
+// generateConversationSummary asks the LLM to create a comprehensive summary of the current conversation
+func (a *Agent) generateConversationSummary(ctx context.Context) (string, error) {
+	msg := `You are being asked to create a comprehensive summary of our conversation so far. This summary will be used to restart our conversation with a shorter history while preserving all important context.
+
+IMPORTANT: Focus ONLY on the actual conversation with the user. Do NOT include any information from system prompts, tool descriptions, or general instructions. Only summarize what the user asked for and what we accomplished together.
+
+Please create a detailed summary that includes:
+
+1. **User's Request**: What did the user originally ask me to do? What was their goal?
+
+2. **Work Completed**: What have we accomplished together? Include any code changes, files created/modified, problems solved, etc.
+
+3. **Key Technical Decisions**: What important technical choices were made during our work and why?
+
+4. **Current State**: What is the current state of the project? What files, tools, or systems are we working with?
+
+5. **Next Steps**: What still needs to be done to complete the user's request?
+
+6. **Important Context**: Any crucial information about the user's codebase, environment, constraints, or specific preferences they mentioned.
+
+Focus on actionable information that would help me continue the user's work seamlessly. Ignore any general tool capabilities or system instructions - only include what's relevant to this specific user's project and goals.
+
+Reply with ONLY the summary content - no meta-commentary about creating the summary.`
+
+	userMessage := llm.UserStringMessage(msg)
+	// Use a subconversation with history to get the summary
+	// TODO: We don't have any tools here, so we should have enough tokens
+	// to capture a summary, but we may need to modify the history (e.g., remove
+	// TODO data) to save on some tokens.
+	convo := a.convo.SubConvoWithHistory()
+
+	// Modify the system prompt to provide context about the original task
+	originalSystemPrompt := convo.SystemPrompt
+	convo.SystemPrompt = fmt.Sprintf(`You are creating a conversation summary for context compaction. The original system prompt contained instructions about being a software engineer and architect for Sketch (an agentic coding environment), with various tools and capabilities for code analysis, file modification, git operations, browser automation, and project management.
+
+Your task is to create a focused summary as requested below. Focus only on the actual user conversation and work accomplished, not the system capabilities or tool descriptions.
+
+Original context: You are working in a coding environment with full access to development tools.`)
+
+	resp, err := convo.SendMessage(userMessage)
+	if err != nil {
+		a.pushToOutbox(ctx, errorMessage(err))
+		return "", err
+	}
+	textContent := collectTextContent(resp)
+
+	// Restore original system prompt (though this subconvo will be discarded)
+	convo.SystemPrompt = originalSystemPrompt
+
+	return textContent, nil
+}
+
+// CompactConversation compacts the current conversation by generating a summary
+// and restarting the conversation with that summary as the initial context
+func (a *Agent) CompactConversation(ctx context.Context) error {
+	summary, err := a.generateConversationSummary(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to generate conversation summary: %w", err)
+	}
+
+	a.mu.Lock()
+
+	// Reset conversation state but keep all other state (git, working dir, etc.)
+	a.firstMessageIndex = len(a.history)
+	a.convo = a.initConvo()
+
+	a.mu.Unlock()
+
+	a.pushToOutbox(ctx, AgentMessage{
+		Type:    CompactMessageType,
+		Content: "📜 Conversation compacted to manage token limits. Previous context preserved in summary below.",
+	})
+
+	a.pushToOutbox(ctx, AgentMessage{
+		Type:    UserMessageType,
+		Content: fmt.Sprintf("Here's a summary of our previous work:\n\n%s\n\nPlease continue with the work based on this summary.", summary),
+	})
+	a.inbox <- fmt.Sprintf("Here's a summary of our previous work:\n\n%s\n\nPlease continue with the work based on this summary.", summary)
+
+	return nil
 }
 
 func (a *Agent) URL() string { return a.url }
@@ -1273,12 +1363,31 @@ func (a *Agent) GatherMessages(ctx context.Context, block bool) ([]llm.Content, 
 		case <-ctx.Done():
 			return m, ctx.Err()
 		case msg := <-a.inbox:
+			// Check for /compact command
+			if msg == "/compact" {
+				// Set pending compaction flag and return empty messages
+				// The processTurn will handle compaction before processing messages
+				a.mu.Lock()
+				a.pendingCompaction = true
+				a.mu.Unlock()
+				// Return empty - processTurn will see pendingCompaction and handle it
+				return m, nil
+			}
 			m = append(m, llm.StringContent(msg))
 		}
 	}
 	for {
 		select {
 		case msg := <-a.inbox:
+			// Check for /compact command
+			if msg == "/compact" {
+				// Set pending compaction flag
+				a.mu.Lock()
+				a.pendingCompaction = true
+				a.mu.Unlock()
+				// Don't add /compact to messages, but continue gathering other messages
+				continue
+			}
 			m = append(m, llm.StringContent(msg))
 		default:
 			return m, nil
@@ -1303,6 +1412,28 @@ func (a *Agent) processTurn(ctx context.Context) error {
 
 	// Handle edge case where both initialResp and err are nil
 	if initialResp == nil {
+		// Check if this is due to pending compaction
+		a.mu.Lock()
+		hasPendingCompaction := a.pendingCompaction
+		if hasPendingCompaction {
+			a.pendingCompaction = false // Clear the flag
+		}
+		a.mu.Unlock()
+
+		if hasPendingCompaction {
+			// Transition to compacting state and perform compaction
+			a.stateMachine.Transition(ctx, StateCompacting, "Processing /compact command")
+
+			if err := a.CompactConversation(ctx); err != nil {
+				a.stateMachine.Transition(ctx, StateError, "Error during compaction: "+err.Error())
+				return err
+			}
+
+			// Transition back to waiting for user input after compaction
+			a.stateMachine.Transition(ctx, StateWaitingForUserInput, "Compaction completed, turn ended")
+			return nil
+		}
+
 		err := fmt.Errorf("unexpected nil response from processUserMessage with no error")
 		a.stateMachine.Transition(ctx, StateError, "Error processing user message: "+err.Error())
 

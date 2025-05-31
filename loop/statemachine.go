@@ -47,6 +47,8 @@ const (
 	StateBudgetExceeded
 	// StateError occurs when an error occurred during processing
 	StateError
+	// StateCompacting occurs when the agent is compacting the conversation
+	StateCompacting
 )
 
 // TransitionEvent represents an event that causes a state transition
@@ -189,7 +191,7 @@ func (sm *StateMachine) initTransitions() {
 	addTransition(StateReady, StateWaitingForUserInput)
 
 	// Main flow
-	addTransition(StateWaitingForUserInput, StateSendingToLLM, StateError)
+	addTransition(StateWaitingForUserInput, StateSendingToLLM, StateCompacting, StateError)
 	addTransition(StateSendingToLLM, StateProcessingLLMResponse, StateError)
 	addTransition(StateProcessingLLMResponse, StateEndOfTurn, StateToolUseRequested, StateError)
 	addTransition(StateEndOfTurn, StateWaitingForUserInput)
@@ -203,6 +205,9 @@ func (sm *StateMachine) initTransitions() {
 	addTransition(StateCheckingBudget, StateGatheringAdditionalMessages, StateBudgetExceeded)
 	addTransition(StateGatheringAdditionalMessages, StateSendingToolResults, StateError)
 	addTransition(StateSendingToolResults, StateProcessingLLMResponse, StateError)
+
+	// Compaction flow
+	addTransition(StateCompacting, StateWaitingForUserInput, StateError)
 
 	// Terminal states to new turn
 	addTransition(StateCancelled, StateWaitingForUserInput)

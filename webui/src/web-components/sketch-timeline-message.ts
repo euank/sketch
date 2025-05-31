@@ -375,6 +375,42 @@ export class SketchTimelineMessage extends LitElement {
       border-left-color: #f44336;
     }
 
+    /* Compact message styling - distinct visual separation */
+    .compact {
+      background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+      border: 2px solid #fd7e14;
+      border-radius: 12px;
+      margin: 20px 0;
+      padding: 0;
+    }
+
+    .compact .message-content {
+      border-left: 4px solid #fd7e14;
+      background: rgba(253, 126, 20, 0.05);
+      font-weight: 500;
+    }
+
+    .compact .message-text {
+      color: #8b4513;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .compact::before {
+      content: "📚 CONVERSATION EPOCH";
+      display: block;
+      text-align: center;
+      font-size: 11px;
+      font-weight: bold;
+      color: #8b4513;
+      background: #fd7e14;
+      color: white;
+      padding: 4px 8px;
+      margin: 0;
+      border-radius: 8px 8px 0 0;
+      letter-spacing: 1px;
+    }
+
     /* Make message type display bold but without the IRC-style markers */
     .message-type {
       font-weight: bold;
