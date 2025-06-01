@@ -1493,6 +1493,22 @@ func (a *Agent) processUserMessage(ctx context.Context) (*llm.Response, error) {
 		return nil, err
 	}
 
+	// Check if compaction was triggered and no real messages were gathered
+	a.mu.Lock()
+	hasPendingCompaction := a.pendingCompaction
+	a.mu.Unlock()
+
+	if hasPendingCompaction && len(msgs) == 0 {
+		// Compaction was triggered, return nil to signal this to processTurn
+		return nil, nil
+	}
+
+	// Only create and send message if we have actual content
+	if len(msgs) == 0 {
+		// No messages to send - this shouldn't happen in normal flow
+		return nil, fmt.Errorf("no messages to send to LLM")
+	}
+
 	userMessage := llm.Message{
 		Role:    llm.MessageRoleUser,
 		Content: msgs,
