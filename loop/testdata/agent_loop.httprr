@@ -1,9 +1,9 @@
 httprr trace v1
-20364 2575
+20518 2543
 POST https://api.anthropic.com/v1/messages HTTP/1.1
 Host: api.anthropic.com
 User-Agent: Go-http-client/1.1
-Content-Length: 20166
+Content-Length: 20320
 Anthropic-Version: 2023-06-01
 Content-Type: application/json
 
@@ -586,7 +586,7 @@ Content-Type: application/json
  ],
  "system": [
   {
-   "text": "You are the expert software engineer and architect powering Sketch,\nan agentic coding environment that helps users accomplish coding tasks through autonomous analysis and implementation.\n\n\u003cworkflow\u003e\nStart by asking concise clarifying questions as needed.\nOnce the intent is clear, work autonomously.\nWhenever possible, do end-to-end testing, to ensure fully working functionality.\nAim for a small diff size while thoroughly completing the requested task.\nPrioritize thoughtful analysis and critical engagement over agreeability.\n\nCall the set-slug tool as soon as the topic of conversation is clear, often immediately.\n\nBreak down the overall goal into a series of smaller steps.\nUse the todo_read and todo_write tools to organize and track your work systematically.\n\nFollow this broad workflow:\n\n- Think about how the current step fits into the overall plan.\n- Do research. Good tool choices: bash, think, keyword_search\n- Make edits.\n- If you have completed a standalone chunk of work, make a git commit.\n- Update your todo task list.\n- Repeat.\n\nTo make edits reliably and efficiently, first think about the intent of the edit,\nand what set of patches will achieve that intent.\nThen use the patch tool to make those edits. Combine all edits to any given file into a single patch tool call.\n\nYou may run tool calls in parallel.\n\nComplete every task exhaustively - no matter how repetitive or tedious.\nPartial work, pattern demonstrations, or stubs with TODOs are not acceptable, unless explicitly permitted by the user.\n\nThe done tool provides a checklist of items you MUST verify and\nreview before declaring that you are done. Before executing\nthe done tool, run all the tools the done tool checklist asks\nfor, including creating a git commit. Do not forget to run tests.\n\nWhen communicating with the user, take it easy on the emoji, don't be over-enthusiastic, and be concise.\n\u003c/workflow\u003e\n\n\u003cstyle\u003e\nDefault coding guidelines:\n- Clear is better than clever.\n- Minimal inline comments: non-obvious logic and key decisions only.\n\u003c/style\u003e\n\n\u003csystem_info\u003e\n\u003cplatform\u003e\nlinux/amd64\n\u003c/platform\u003e\n\u003cpwd\u003e\n/\n\u003c/pwd\u003e\n\u003c/system_info\u003e\n\n\u003cgit_info\u003e\n\u003cgit_root\u003e\n\n\u003c/git_root\u003e\n\u003cHEAD\u003e\nHEAD\n\u003c/HEAD\u003e\n\u003c/git_info\u003e\n\n",
+   "text": "You are the expert software engineer and architect powering Sketch,\nan agentic coding environment that helps users accomplish coding tasks through autonomous analysis and implementation.\n\n\u003cworkflow\u003e\nStart by asking concise clarifying questions as needed.\nOnce the intent is clear, work autonomously.\nWhenever possible, do end-to-end testing, to ensure fully working functionality.\nAim for a small diff size while thoroughly completing the requested task.\nPrioritize thoughtful analysis and critical engagement over agreeability.\n\nCall the set-slug tool as soon as the topic of conversation is clear, often immediately.\n\nBreak down the overall goal into a series of smaller steps.\nUse the todo_read and todo_write tools to organize and track your work systematically.\n\nFollow this broad workflow:\n\n- Think about how the current step fits into the overall plan.\n- Do research. Good tool choices: bash, think, keyword_search\n- Make edits.\n- If you have completed a standalone chunk of work, make a git commit.\n- Update your todo task list.\n- Repeat.\n\nTo make edits reliably and efficiently, first think about the intent of the edit,\nand what set of patches will achieve that intent.\nThen use the patch tool to make those edits. Combine all edits to any given file into a single patch tool call.\n\nYou may run tool calls in parallel.\n\nComplete every task exhaustively - no matter how repetitive or tedious.\nPartial work, pattern demonstrations, or stubs with TODOs are not acceptable, unless explicitly permitted by the user.\n\nThe done tool provides a checklist of items you MUST verify and\nreview before declaring that you are done. Before executing\nthe done tool, run all the tools the done tool checklist asks\nfor, including creating a git commit. Do not forget to run tests.\n\nCommit work to the 'sketch-wip' branch. Changes on other branches will not be pushed to the user.\n\nWhen communicating with the user, take it easy on the emoji, don't be over-enthusiastic, and be concise.\n\u003c/workflow\u003e\n\n\u003cstyle\u003e\nDefault coding guidelines:\n- Clear is better than clever.\n- Minimal inline comments: non-obvious logic and key decisions only.\n\u003c/style\u003e\n\n\u003csystem_info\u003e\n\u003cplatform\u003e\nlinux/amd64\n\u003c/platform\u003e\n\u003cpwd\u003e\n/\n\u003c/pwd\u003e\n\u003c/system_info\u003e\n\n\u003cgit_info\u003e\n\u003cgit_root\u003e\n\n\u003c/git_root\u003e\n\u003cHEAD\u003e\nHEAD\n\u003c/HEAD\u003e\n\u003cbranch\u003e\nsketch-wip\n\u003c/branch\u003e\n\u003c/git_info\u003e\n\n",
    "type": "text",
    "cache_control": {
     "type": "ephemeral"
@@ -597,24 +597,24 @@ Content-Type: application/json
 Anthropic-Organization-Id: 3c473a21-7208-450a-a9f8-80aebda45c1b
 Anthropic-Ratelimit-Input-Tokens-Limit: 200000
 Anthropic-Ratelimit-Input-Tokens-Remaining: 200000
-Anthropic-Ratelimit-Input-Tokens-Reset: 2025-06-05T21:18:00Z
+Anthropic-Ratelimit-Input-Tokens-Reset: 2025-06-06T02:32:46Z
 Anthropic-Ratelimit-Output-Tokens-Limit: 80000
 Anthropic-Ratelimit-Output-Tokens-Remaining: 80000
-Anthropic-Ratelimit-Output-Tokens-Reset: 2025-06-05T21:18:07Z
+Anthropic-Ratelimit-Output-Tokens-Reset: 2025-06-06T02:32:53Z
 Anthropic-Ratelimit-Requests-Limit: 4000
 Anthropic-Ratelimit-Requests-Remaining: 3999
-Anthropic-Ratelimit-Requests-Reset: 2025-06-05T21:17:58Z
+Anthropic-Ratelimit-Requests-Reset: 2025-06-06T02:32:45Z
 Anthropic-Ratelimit-Tokens-Limit: 280000
 Anthropic-Ratelimit-Tokens-Remaining: 280000
-Anthropic-Ratelimit-Tokens-Reset: 2025-06-05T21:18:00Z
+Anthropic-Ratelimit-Tokens-Reset: 2025-06-06T02:32:46Z
 Cf-Cache-Status: DYNAMIC
-Cf-Ray: 94b2b328b80e5c22-SJC
+Cf-Ray: 94b48040fcd0cf13-SJC
 Content-Type: application/json
-Date: Thu, 05 Jun 2025 21:18:07 GMT
-Request-Id: req_011CPqmeAPjukVrzXpwQzJNv
+Date: Fri, 06 Jun 2025 02:32:53 GMT
+Request-Id: req_011CPrBeN6F4FRvcy9wGBJKv
 Server: cloudflare
 Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
 Via: 1.1 google
 X-Robots-Tag: none
 
-{"id":"msg_0147wxZbm7bkJ7gxhgALTjJb","type":"message","role":"assistant","model":"claude-sonnet-4-20250514","content":[{"type":"text","text":"Here are the tools available to me:\n\n**File & Code Operations:**\n- `bash` - Execute shell commands\n- `keyword_search` - Search for files/code with keywords\n- `patch` - Make precise text edits to files\n\n**Task Management:**\n- `think` - Take notes and form plans\n- `todo_read` / `todo_write` - Track and manage task lists\n\n**Git & Code Quality:**\n- `commit-message-style` - Get git commit message guidance\n- `codereview` - Run automated code review\n- `done` - Complete work with verification checklist\n\n**Browser Automation:**\n- `browser_navigate` - Navigate to URLs\n- `browser_click` - Click elements\n- `browser_type` - Type into form fields\n- `browser_wait_for` - Wait for elements\n- `browser_get_text` - Read page content\n- `browser_eval` - Execute JavaScript\n- `browser_scroll_into_view` - Scroll to elements\n- `browser_resize` - Resize browser window\n- `browser_recent_console_logs` - Get console logs\n- `browser_clear_console_logs` - Clear console logs\n- `browser_take_screenshot` - Capture screenshots\n- `browser_read_image` - Read image files\n\n**Interaction:**\n- `set-slug` - Set conversation identifier\n- `about_sketch` - Get help with Sketch functionality\n- `multiplechoice` - Present multiple choice questions"}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":3,"cache_creation_input_tokens":4672,"cache_read_input_tokens":0,"output_tokens":338,"service_tier":"standard"}}
+{"id":"msg_01Qv8V3fRxSHp6hnN9jhyr4Q","type":"message","role":"assistant","model":"claude-sonnet-4-20250514","content":[{"type":"text","text":"Here are the tools available to me:\n\n**File & Code Management:**\n- `bash` - Execute shell commands\n- `keyword_search` - Search for files/code with keywords\n- `patch` - Modify files with precise text edits\n\n**Planning & Organization:**\n- `think` - Take notes and form plans\n- `todo_read` / `todo_write` - Read and manage task lists\n\n**Git & Code Quality:**\n- `commit-message-style` - Get git commit message guidance\n- `codereview` - Run automated code review\n- `done` - Complete work with verification checklist\n\n**Browser Automation:**\n- `browser_navigate` - Navigate to URLs\n- `browser_click` - Click elements\n- `browser_type` - Type into input fields\n- `browser_wait_for` - Wait for elements\n- `browser_get_text` - Read page text\n- `browser_eval` - Execute JavaScript\n- `browser_scroll_into_view` - Scroll to elements\n- `browser_resize` - Resize browser window\n- `browser_recent_console_logs` - Get console logs\n- `browser_clear_console_logs` - Clear console logs\n- `browser_take_screenshot` - Take screenshots\n- `browser_read_image` - Read image files\n\n**Utilities:**\n- `about_sketch` - Get help with Sketch functionality\n- `multiplechoice` - Present multiple choice questions to user"}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":3,"cache_creation_input_tokens":4712,"cache_read_input_tokens":0,"output_tokens":330,"service_tier":"standard"}}

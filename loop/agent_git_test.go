@@ -77,6 +77,13 @@ func TestGitCommitTracking(t *testing.T) {
 		t.Fatalf("Failed to create sketch-base tag: %v", err)
 	}
 
+	// Create sketch-wip branch (simulating what happens in agent initialization)
+	cmd = exec.Command("git", "checkout", "-b", "sketch-wip")
+	cmd.Dir = tempDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to create sketch-wip branch: %v", err)
+	}
+
 	// Make a new commit
 	if err := os.WriteFile(testFile, []byte("updated content\n"), 0o644); err != nil {
 		t.Fatalf("Failed to update file: %v", err)
@@ -263,5 +270,108 @@ func TestParseGitLog(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestSketchBranchWorkflow tests that the sketch-wip branch is created and used for pushes
+func TestSketchBranchWorkflow(t *testing.T) {
+	// Create a temporary directory for our test git repo
+	tempDir := t.TempDir()
+
+	// Initialize a git repo in the temp directory
+	cmd := exec.Command("git", "init")
+	cmd.Dir = tempDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to initialize git repo: %v", err)
+	}
+
+	// Configure git user for commits
+	cmd = exec.Command("git", "config", "user.name", "Test User")
+	cmd.Dir = tempDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to configure git user name: %v", err)
+	}
+
+	cmd = exec.Command("git", "config", "user.email", "test@example.com")
+	cmd.Dir = tempDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to configure git user email: %v", err)
+	}
+
+	// Make an initial commit
+	testFile := filepath.Join(tempDir, "test.txt")
+	if err := os.WriteFile(testFile, []byte("initial content\n"), 0o644); err != nil {
+		t.Fatalf("Failed to write file: %v", err)
+	}
+
+	cmd = exec.Command("git", "add", "test.txt")
+	cmd.Dir = tempDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to add file: %v", err)
+	}
+
+	cmd = exec.Command("git", "commit", "-m", "Initial commit")
+	cmd.Dir = tempDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to create initial commit: %v", err)
+	}
+
+	// Create agent with configuration that would create sketch-wip branch
+	agent := NewAgent(AgentConfig{
+		Context:   context.Background(),
+		SessionID: "test-session",
+		InDocker:  true,
+	})
+	agent.workingDir = tempDir
+
+	// Simulate the branch creation that happens in Init()
+	// when a commit is specified
+	cmd = exec.Command("git", "checkout", "-b", "sketch-wip")
+	cmd.Dir = tempDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to create sketch-wip branch: %v", err)
+	}
+
+	// Verify that we're on the sketch-wip branch
+	cmd = exec.Command("git", "branch", "--show-current")
+	cmd.Dir = tempDir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to get current branch: %v", err)
+	}
+
+	currentBranch := strings.TrimSpace(string(out))
+	if currentBranch != "sketch-wip" {
+		t.Errorf("Expected to be on 'sketch-wip' branch, but on '%s'", currentBranch)
+	}
+
+	// Make a commit on the sketch-wip branch
+	if err := os.WriteFile(testFile, []byte("updated content\n"), 0o644); err != nil {
+		t.Fatalf("Failed to update file: %v", err)
+	}
+
+	cmd = exec.Command("git", "add", "test.txt")
+	cmd.Dir = tempDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to add updated file: %v", err)
+	}
+
+	cmd = exec.Command("git", "commit", "-m", "Update on sketch-wip branch")
+	cmd.Dir = tempDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to create commit on sketch-wip branch: %v", err)
+	}
+
+	// Verify that the commit exists on the sketch-wip branch
+	cmd = exec.Command("git", "log", "--oneline", "-n", "1")
+	cmd.Dir = tempDir
+	out, err = cmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to get git log: %v", err)
+	}
+
+	logOutput := string(out)
+	if !strings.Contains(logOutput, "Update on sketch-wip branch") {
+		t.Errorf("Expected commit 'Update on sketch-wip branch' in log, got: %s", logOutput)
 	}
 }

@@ -52,16 +52,16 @@ NB: In this section, all git commands have been modified to be accurate for this
 {{ $branch = .Branch}}
 {{ end }}
 
-- Sketch is trained to make git commits. When those happen, they are automatically pushed to the git repository where you started sketch with branch names `sketch/*`.
+- Sketch is trained to make git commits to the sketch-wip branch in the container. When those happen, they are automatically pushed to the git repository where you started sketch, with branch names like `sketch/*`.
 - Use `git branch -a --sort=creatordate | grep sketch/ | tail` to find Sketch branches.
-- The UI keeps track of the latest branch it pushed and displays it prominently.
+- The UI keeps track of the latest commit it pushed and display the branch name for it prominently in the top bar.
 - You can integrate Sketch's changes using:
   ```
   git cherry-pick $(git merge-base origin/main {{$branch}})
   git merge {{$branch}}
   git reset --hard {{$branch}}
   ```
-- You can ask Sketch to `git fetch sketch-host` and rebase onto another commit.
+- You can ask Sketch to `git fetch origin` and rebase its sketch-wip branch onto another commit.
 - Sketch is good at helping you rebase, merge/squash commits, rewrite commit messages, and other Git operations.
 
 ## Reviewing Diffs

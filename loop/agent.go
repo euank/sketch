@@ -315,11 +315,11 @@ type ConvoInterface interface {
 }
 
 // AgentGitState holds the state necessary for pushing to a remote git repo
-// when HEAD changes. If gitRemoteAddr is set, then we push to sketch/
+// when sketch branch changes. If gitRemoteAddr is set, then we push to sketch/
 // any time we notice we need to.
 type AgentGitState struct {
 	mu            sync.Mutex      // protects following
-	lastHEAD      string          // hash of the last HEAD that was pushed to the host
+	lastSketch    string          // hash of the last sketch branch that was pushed to the host
 	gitRemoteAddr string          // HTTP URL of the host git repo
 	upstream      string          // upstream branch for git work
 	seenCommits   map[string]bool // Track git commits we've already seen (by hash)
@@ -1102,6 +1102,13 @@ func (a *Agent) Init(ini AgentInit) error {
 				return fmt.Errorf("git checkout %s: %s: %w", a.config.Commit, checkoutOut, err)
 			}
 		}
+
+		// Create and checkout sketch-wip branch
+		cmd = exec.CommandContext(ctx, "git", "checkout", "-b", "sketch-wip")
+		cmd.Dir = a.workingDir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git checkout -b sketch-wip: %s: %w", out, err)
+		}
 	}
 
 	if ini.HostAddr != "" {
@@ -1145,7 +1152,7 @@ func (a *Agent) Init(ini AgentInit) error {
 		a.codereview = codereview
 
 	}
-	a.gitState.lastHEAD = a.SketchGitBase()
+	a.gitState.lastSketch = a.SketchGitBase()
 	a.convo = a.initConvo()
 	close(a.ready)
 	return nil
@@ -1849,15 +1856,15 @@ func (ags *AgentGitState) handleGitCommits(ctx context.Context, sessionID string
 		return msgs, nil, nil
 	}
 
-	head, err := resolveRef(ctx, repoRoot, "HEAD")
+	sketch, err := resolveRef(ctx, repoRoot, "sketch-wip")
 	if err != nil {
 		return msgs, nil, err
 	}
-	if head == ags.lastHEAD {
+	if sketch == ags.lastSketch {
 		return msgs, nil, nil // nothing to do
 	}
 	defer func() {
-		ags.lastHEAD = head
+		ags.lastSketch = sketch
 	}()
 
 	// Get new commits. Because it's possible that the agent does rebases, fixups, and
@@ -1869,7 +1876,7 @@ func (ags *AgentGitState) handleGitCommits(ctx context.Context, sessionID string
 	// Format: <hash>\0<subject>\0<body>\0
 	// This uses NULL bytes as separators to avoid issues with newlines in commit messages
 	// Limit to 100 commits to avoid overwhelming the user
-	cmd := exec.CommandContext(ctx, "git", "log", "-n", "100", "--pretty=format:%H%x00%s%x00%b%x00", "^"+baseRef, head)
+	cmd := exec.CommandContext(ctx, "git", "log", "-n", "100", "--pretty=format:%H%x00%s%x00%b%x00", "^"+baseRef, sketch)
 	cmd.Dir = repoRoot
 	output, err := cmd.Output()
 	if err != nil {
@@ -1879,16 +1886,16 @@ func (ags *AgentGitState) handleGitCommits(ctx context.Context, sessionID string
 	// Parse git log output and filter out already seen commits
 	parsedCommits := parseGitLog(string(output))
 
-	var headCommit *GitCommit
+	var sketchCommit *GitCommit
 
 	// Filter out commits we've already seen
 	for _, commit := range parsedCommits {
-		if commit.Hash == head {
-			headCommit = &commit
+		if commit.Hash == sketch {
+			sketchCommit = &commit
 		}
 
-		// Skip if we've seen this commit before. If our head has changed, always include that.
-		if ags.seenCommits[commit.Hash] && commit.Hash != head {
+		// Skip if we've seen this commit before. If our sketch branch has changed, always include that.
+		if ags.seenCommits[commit.Hash] && commit.Hash != sketch {
 			continue
 		}
 
@@ -1900,12 +1907,12 @@ func (ags *AgentGitState) handleGitCommits(ctx context.Context, sessionID string
 	}
 
 	if ags.gitRemoteAddr != "" {
-		if headCommit == nil {
+		if sketchCommit == nil {
 			// I think this can only happen if we have a bug or if there's a race.
-			headCommit = &GitCommit{}
-			headCommit.Hash = head
-			headCommit.Subject = "unknown"
-			commits = append(commits, headCommit)
+			sketchCommit = &GitCommit{}
+			sketchCommit.Hash = sketch
+			sketchCommit.Subject = "unknown"
+			commits = append(commits, sketchCommit)
 		}
 
 		// TODO: I don't love the force push here. We could see if the push is a fast-forward, and,
@@ -1923,7 +1930,7 @@ func (ags *AgentGitState) handleGitCommits(ctx context.Context, sessionID string
 			}
 
 			branch := ags.branchNameLocked(branchPrefix)
-			cmd = exec.Command("git", "push", "--force", ags.gitRemoteAddr, "HEAD:refs/heads/"+branch)
+			cmd = exec.Command("git", "push", "--force", ags.gitRemoteAddr, "sketch-wip:refs/heads/"+branch)
 			cmd.Dir = repoRoot
 			out, err = cmd.CombinedOutput()
 
@@ -1943,7 +1950,7 @@ func (ags *AgentGitState) handleGitCommits(ctx context.Context, sessionID string
 			msgs = append(msgs, errorMessage(fmt.Errorf("git push to host: %s: %v", out, err)))
 		} else {
 			finalBranch := ags.branchNameLocked(branchPrefix)
-			headCommit.PushedBranch = finalBranch
+			sketchCommit.PushedBranch = finalBranch
 			if ags.retryNumber != originalRetryNumber {
 				// Notify user that the branch name was changed, and why
 				msgs = append(msgs, AgentMessage{
