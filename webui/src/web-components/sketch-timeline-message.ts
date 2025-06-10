@@ -1,7 +1,7 @@
 import { css, html, LitElement, render } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { customElement, property, state } from "lit/decorators.js";
-import { AgentMessage } from "../types";
+import { AgentMessage, State } from "../types";
 import { marked, MarkedOptions, Renderer, Tokens } from "marked";
 import mermaid from "mermaid";
 import DOMPurify from "dompurify";
@@ -10,6 +10,9 @@ import "./sketch-tool-calls";
 export class SketchTimelineMessage extends LitElement {
   @property()
   message: AgentMessage;
+
+  @property()
+  state: State;
 
   @property()
   previousMessage: AgentMessage;
@@ -499,6 +502,43 @@ export class SketchTimelineMessage extends LitElement {
 
     .commit-branch:hover {
       background-color: rgba(40, 167, 69, 0.15);
+    }
+
+    .commit-branch-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .commit-branch-container .copy-icon {
+      opacity: 0.7;
+      display: flex;
+      align-items: center;
+    }
+
+    .commit-branch-container .copy-icon svg {
+      vertical-align: middle;
+    }
+
+    .commit-branch-container:hover .copy-icon {
+      opacity: 1;
+    }
+
+    .octocat-link {
+      color: #586069;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      transition: color 0.2s ease;
+    }
+
+    .octocat-link:hover {
+      color: #0366d6;
+    }
+
+    .octocat-icon {
+      width: 14px;
+      height: 14px;
     }
 
     .commit-subject {
@@ -1064,6 +1104,49 @@ export class SketchTimelineMessage extends LitElement {
     }, 1500);
   }
 
+  // Format GitHub repository URL to org/repo format
+  formatGitHubRepo(url) {
+    if (!url) return null;
+
+    // Common GitHub URL patterns
+    const patterns = [
+      // HTTPS URLs
+      /https:\/\/github\.com\/([^/]+)\/([^/\s.]+)(?:\.git)?/,
+      // SSH URLs
+      /git@github\.com:([^/]+)\/([^/\s.]+)(?:\.git)?/,
+      // Git protocol
+      /git:\/\/github\.com\/([^/]+)\/([^/\s.]+)(?:\.git)?/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) {
+        return {
+          formatted: `${match[1]}/${match[2]}`,
+          url: `https://github.com/${match[1]}/${match[2]}`,
+          owner: match[1],
+          repo: match[2],
+        };
+      }
+    }
+
+    return null;
+  }
+
+  // Generate GitHub branch URL if linking is enabled
+  getGitHubBranchLink(branchName) {
+    if (!this.state?.link_to_github || !branchName) {
+      return null;
+    }
+
+    const github = this.formatGitHubRepo(this.state?.git_origin);
+    if (!github) {
+      return null;
+    }
+
+    return `https://github.com/${github.owner}/${github.repo}/tree/${branchName}`;
+  }
+
   render() {
     // Calculate if this is an end of turn message with no parent conversation ID
     const isEndOfTurn =
@@ -1265,18 +1348,75 @@ export class SketchTimelineMessage extends LitElement {
                               ${commit.hash.substring(0, 8)}
                             </span>
                             ${commit.pushed_branch
-                              ? html`
-                                  <span
-                                    class="commit-branch pushed-branch"
-                                    title="Click to copy: ${commit.pushed_branch}"
-                                    @click=${(e) =>
-                                      this.copyToClipboard(
-                                        commit.pushed_branch,
-                                        e,
-                                      )}
-                                    >${commit.pushed_branch}</span
-                                  >
-                                `
+                              ? (() => {
+                                  const githubLink = this.getGitHubBranchLink(
+                                    commit.pushed_branch,
+                                  );
+                                  return html`
+                                    <div class="commit-branch-container">
+                                      <span
+                                        class="commit-branch pushed-branch"
+                                        title="Click to copy: ${commit.pushed_branch}"
+                                        @click=${(e) =>
+                                          this.copyToClipboard(
+                                            commit.pushed_branch,
+                                            e,
+                                          )}
+                                        >${commit.pushed_branch}</span
+                                      >
+                                      <span class="copy-icon">
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          width="14"
+                                          height="14"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          stroke-width="2"
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                        >
+                                          <rect
+                                            x="9"
+                                            y="9"
+                                            width="13"
+                                            height="13"
+                                            rx="2"
+                                            ry="2"
+                                          ></rect>
+                                          <path
+                                            d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                                          ></path>
+                                        </svg>
+                                      </span>
+                                      ${githubLink
+                                        ? html`
+                                            <a
+                                              href="${githubLink}"
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              class="octocat-link"
+                                              title="Open ${commit.pushed_branch} on GitHub"
+                                              @click=${(e) =>
+                                                e.stopPropagation()}
+                                            >
+                                              <svg
+                                                class="octocat-icon"
+                                                viewBox="0 0 16 16"
+                                                width="14"
+                                                height="14"
+                                              >
+                                                <path
+                                                  fill="currentColor"
+                                                  d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+                                                />
+                                              </svg>
+                                            </a>
+                                          `
+                                        : ""}
+                                    </div>
+                                  `;
+                                })()
                               : ``}
                             <span class="commit-subject"
                               >${commit.subject}</span

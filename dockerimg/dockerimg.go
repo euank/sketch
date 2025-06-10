@@ -121,6 +121,9 @@ type ContainerConfig struct {
 
 	// Prefix for git branches created by sketch
 	BranchPrefix string
+
+	// LinkToGitHub enables GitHub branch linking in UI
+	LinkToGitHub bool
 }
 
 // LaunchContainer creates a docker container for a project, installs sketch and opens a connection to it.
@@ -556,6 +559,7 @@ func createDockerContainer(ctx context.Context, cntrName, hostPort, relPath, img
 		"-verbose="+fmt.Sprintf("%t", config.Verbose),
 		"-x="+config.ExperimentFlag,
 		"-branch-prefix="+config.BranchPrefix,
+		"-link-to-github="+fmt.Sprintf("%t", config.LinkToGitHub),
 	)
 	if config.Model != "" {
 		cmdArgs = append(cmdArgs, "-model="+config.Model)

@@ -89,6 +89,7 @@ export interface State {
 	inside_working_dir?: string;
 	todo_content?: string;
 	skaband_addr?: string;
+	link_to_github?: boolean;
 }
 
 export interface TodoItem {

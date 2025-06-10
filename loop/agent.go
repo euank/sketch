@@ -68,6 +68,9 @@ type CodingAgent interface {
 	// BranchPrefix returns the configured branch prefix
 	BranchPrefix() string
 
+	// LinkToGitHub returns whether GitHub branch linking is enabled
+	LinkToGitHub() bool
+
 	CancelTurn(cause error)
 
 	CancelToolUse(toolUseID string, cause error) error
@@ -992,6 +995,8 @@ type AgentConfig struct {
 	Commit string
 	// Prefix for git branches created by sketch
 	BranchPrefix string
+	// LinkToGitHub enables GitHub branch linking in UI
+	LinkToGitHub bool
 	// Skaband client for session history (optional)
 	SkabandClient *skabandclient.SkabandClient
 }
@@ -1375,6 +1380,11 @@ func (a *Agent) Ready() <-chan struct{} {
 // BranchPrefix returns the configured branch prefix
 func (a *Agent) BranchPrefix() string {
 	return a.config.BranchPrefix
+}
+
+// LinkToGitHub returns whether GitHub branch linking is enabled
+func (a *Agent) LinkToGitHub() bool {
+	return a.config.LinkToGitHub
 }
 
 func (a *Agent) UserMessage(ctx context.Context, msg string) {
