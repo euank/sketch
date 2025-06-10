@@ -2,7 +2,7 @@ import { css, html, LitElement } from "lit";
 import { PropertyValues } from "lit";
 import { repeat } from "lit/directives/repeat.js";
 import { customElement, property, state } from "lit/decorators.js";
-import { AgentMessage } from "../types";
+import { AgentMessage, State } from "../types";
 import "./sketch-timeline-message";
 import { Ref } from "lit/directives/ref";
 
@@ -30,6 +30,9 @@ export class SketchTimeline extends LitElement {
 
   @property({ attribute: false })
   firstMessageIndex: number = 0;
+
+  @property({ attribute: false })
+  state: State | null = null;
 
   static styles = css`
     /* Hide views initially to prevent flash of content */
@@ -402,6 +405,7 @@ export class SketchTimeline extends LitElement {
                   .previousMessage=${previousMessage}
                   .open=${false}
                   .firstMessageIndex=${this.firstMessageIndex}
+                  .state=${this.state}
                 ></sketch-timeline-message>`;
               },
             )}

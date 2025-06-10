@@ -1352,6 +1352,7 @@ export class SketchAppShell extends LitElement {
                 .toolCalls=${this.containerState?.outstanding_tool_calls || []}
                 .firstMessageIndex=${this.containerState?.first_message_index ||
                 0}
+                .state=${this.containerState}
               ></sketch-timeline>
             </div>
           </div>

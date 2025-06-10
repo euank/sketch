@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -207,7 +208,13 @@ func (ui *TermUI) receiveMessagesLoop(ctx context.Context) {
 			// Display each commit in the terminal
 			for _, commit := range resp.Commits {
 				if commit.PushedBranch != "" {
-					ui.AppendSystemMessage("🔄 new commit: [%s] %s\npushed to: %s", commit.Hash[:8], commit.Subject, bold(commit.PushedBranch))
+					// Check if we should show a GitHub link
+					githubURL := ui.getGitHubBranchURL(commit.PushedBranch)
+					if githubURL != "" {
+						ui.AppendSystemMessage("🔄 new commit: [%s] %s\npushed to: %s\n🔗 %s", commit.Hash[:8], commit.Subject, bold(commit.PushedBranch), githubURL)
+					} else {
+						ui.AppendSystemMessage("🔄 new commit: [%s] %s\npushed to: %s", commit.Hash[:8], commit.Subject, bold(commit.PushedBranch))
+					}
 
 					// Track the pushed branch in our map
 					ui.mu.Lock()
@@ -291,6 +298,10 @@ Special commands:
 				initialCommitRef := getShortSHA(ui.agent.SketchGitBase())
 				if len(branches) == 1 {
 					ui.AppendSystemMessage("\n🔄 Branch pushed during session: %s", branches[0])
+					// Add GitHub link if available
+					if githubURL := ui.getGitHubBranchURL(branches[0]); githubURL != "" {
+						ui.AppendSystemMessage("🔗 %s", githubURL)
+					}
 					ui.AppendSystemMessage("🍒 Cherry-pick those changes: git cherry-pick %s..%s", initialCommitRef, branches[0])
 					ui.AppendSystemMessage("🔀 Merge those changes:       git merge %s", branches[0])
 					ui.AppendSystemMessage("🗑️  Delete the branch:         git branch -D %s", branches[0])
@@ -298,6 +309,10 @@ Special commands:
 					ui.AppendSystemMessage("\n🔄 Branches pushed during session:")
 					for _, branch := range branches {
 						ui.AppendSystemMessage("- %s", branch)
+						// Add GitHub link if available
+						if githubURL := ui.getGitHubBranchURL(branch); githubURL != "" {
+							ui.AppendSystemMessage("  🔗 %s", githubURL)
+						}
 					}
 					ui.AppendSystemMessage("\n🍒 To add all those changes to your branch:")
 					for _, branch := range branches {
@@ -487,4 +502,56 @@ func getShortSHA(sha string) string {
 		}
 	}
 	return sha
+}
+
+// isGitHubRepo checks if the git origin URL is a GitHub repository
+func (ui *TermUI) isGitHubRepo() bool {
+	gitOrigin := ui.agent.GitOrigin()
+	if gitOrigin == "" {
+		return false
+	}
+
+	// Common GitHub URL patterns
+	patterns := []string{
+		`^https://github\.com/[^/]+/[^/\s.]+(?:\.git)?`,
+		`^git@github\.com:[^/]+/[^/\s.]+(?:\.git)?`,
+		`^git://github\.com/[^/]+/[^/\s.]+(?:\.git)?`,
+	}
+
+	for _, pattern := range patterns {
+		if matched, _ := regexp.MatchString(pattern, gitOrigin); matched {
+			return true
+		}
+	}
+	return false
+}
+
+// getGitHubBranchURL generates a GitHub branch URL if conditions are met
+func (ui *TermUI) getGitHubBranchURL(branchName string) string {
+	if !ui.agent.LinkToGitHub() || branchName == "" {
+		return ""
+	}
+
+	gitOrigin := ui.agent.GitOrigin()
+	if gitOrigin == "" || !ui.isGitHubRepo() {
+		return ""
+	}
+
+	// Extract owner and repo from GitHub URL
+	patterns := []string{
+		`^https://github\.com/([^/]+)/([^/\s.]+)(?:\.git)?`,
+		`^git@github\.com:([^/]+)/([^/\s.]+)(?:\.git)?`,
+		`^git://github\.com/([^/]+)/([^/\s.]+)(?:\.git)?`,
+	}
+
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(gitOrigin)
+		if len(matches) == 3 {
+			owner := matches[1]
+			repo := matches[2]
+			return fmt.Sprintf("https://github.com/%s/%s/tree/%s", owner, repo, branchName)
+		}
+	}
+	return ""
 }

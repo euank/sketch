@@ -95,8 +95,9 @@ type State struct {
 	InsideOS             string                        `json:"inside_os,omitempty"`
 	OutsideWorkingDir    string                        `json:"outside_working_dir,omitempty"`
 	InsideWorkingDir     string                        `json:"inside_working_dir,omitempty"`
-	TodoContent          string                        `json:"todo_content,omitempty"` // Contains todo list JSON data
-	SkabandAddr          string                        `json:"skaband_addr,omitempty"` // URL of the skaband server
+	TodoContent          string                        `json:"todo_content,omitempty"`   // Contains todo list JSON data
+	SkabandAddr          string                        `json:"skaband_addr,omitempty"`   // URL of the skaband server
+	LinkToGitHub         bool                          `json:"link_to_github,omitempty"` // Enable GitHub branch linking in UI
 }
 
 type InitRequest struct {
@@ -1306,6 +1307,7 @@ func (s *Server) getState() State {
 		AgentState:           s.agent.CurrentStateName(),
 		TodoContent:          s.agent.CurrentTodoContent(),
 		SkabandAddr:          s.agent.SkabandAddr(),
+		LinkToGitHub:         s.agent.LinkToGitHub(),
 	}
 }
 
