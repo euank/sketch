@@ -27,6 +27,8 @@ export class SketchTerminal extends LitElement {
   // Connection error message
   @state()
   connectionError: string = '';
+  // Connection monitoring interval
+  private connectionMonitorInterval: number | null = null;
 
   static styles = css`
     /* Terminal View Styles */
@@ -47,11 +49,13 @@ export class SketchTerminal extends LitElement {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 10px;
-      padding: 8px 12px;
+      margin-bottom: 8px;
+      padding: 6px 10px;
       background-color: #e8e8e8;
       border-radius: 4px;
-      font-size: 12px;
+      font-size: 11px;
+      min-height: 24px;
+      flex-shrink: 0;
     }
 
     .connection-status {
@@ -90,7 +94,12 @@ export class SketchTerminal extends LitElement {
       100% { opacity: 1; }
     }
 
-    .reconnect-button {
+    .terminal-buttons {
+      display: flex;
+      gap: 6px;
+    }
+
+    .terminal-button {
       background: #2196f3;
       color: white;
       border: none;
@@ -101,13 +110,21 @@ export class SketchTerminal extends LitElement {
       transition: background-color 0.2s;
     }
 
-    .reconnect-button:hover {
+    .terminal-button:hover {
       background: #1976d2;
     }
 
-    .reconnect-button:disabled {
+    .terminal-button:disabled {
       background: #ccc;
       cursor: not-allowed;
+    }
+
+    .terminal-button.secondary {
+      background: #757575;
+    }
+
+    .terminal-button.secondary:hover {
+      background: #616161;
     }
 
     .error-message {
@@ -147,6 +164,7 @@ export class SketchTerminal extends LitElement {
     window.removeEventListener("view-mode-select", this._handleViewModeSelect);
 
     this.closeTerminalConnections();
+    this.stopConnectionMonitoring();
 
     if (this.terminal) {
       this.terminal.dispose();
@@ -306,6 +324,7 @@ export class SketchTerminal extends LitElement {
         this.connectionState = 'connected';
         this.connectionError = '';
         this.sendTerminalResize();
+        this.startConnectionMonitoring();
       };
 
       this.terminalEventSource.onmessage = (event) => {
@@ -314,6 +333,14 @@ export class SketchTerminal extends LitElement {
           try {
             // @ts-ignore This isn't in the type definitions yet; it's pretty new?!?
             const decoded = base64ToUint8Array(event.data);
+            const decodedText = new TextDecoder().decode(decoded);
+            
+            // Check for connection error messages in terminal output
+            if (decodedText.includes('Connection error') || decodedText.includes('connection error')) {
+              this.connectionState = 'error';
+              this.connectionError = 'Terminal connection lost';
+            }
+            
             this.terminal.write(decoded);
           } catch (e) {
             console.error("Error decoding terminal data:", e);
@@ -364,8 +391,47 @@ export class SketchTerminal extends LitElement {
       this.terminalEventSource.close();
       this.terminalEventSource = null;
     }
+    this.stopConnectionMonitoring();
     if (this.connectionState !== 'disconnected') {
       this.connectionState = 'disconnected';
+    }
+  }
+
+  /**
+   * Start monitoring the connection state
+   */
+  private startConnectionMonitoring(): void {
+    this.stopConnectionMonitoring();
+    this.connectionMonitorInterval = window.setInterval(() => {
+      if (this.terminalEventSource) {
+        const readyState = this.terminalEventSource.readyState;
+        if (readyState === EventSource.CLOSED) {
+          console.log('Connection monitor detected closed connection');
+          this.connectionState = 'error';
+          this.connectionError = 'Connection lost';
+          this.stopConnectionMonitoring();
+        } else if (readyState === EventSource.CONNECTING) {
+          if (this.connectionState !== 'connecting') {
+            this.connectionState = 'connecting';
+            this.connectionError = '';
+          }
+        } else if (readyState === EventSource.OPEN) {
+          if (this.connectionState !== 'connected') {
+            this.connectionState = 'connected';
+            this.connectionError = '';
+          }
+        }
+      }
+    }, 1000); // Check every second
+  }
+
+  /**
+   * Stop monitoring the connection state
+   */
+  private stopConnectionMonitoring(): void {
+    if (this.connectionMonitorInterval) {
+      clearInterval(this.connectionMonitorInterval);
+      this.connectionMonitorInterval = null;
     }
   }
 
@@ -379,6 +445,21 @@ export class SketchTerminal extends LitElement {
     
     console.log('Attempting to reconnect to terminal...');
     await this.connectTerminal();
+  }
+
+  /**
+   * Force terminal redraw/refresh
+   */
+  private redrawTerminal(): void {
+    if (this.terminal && this.fitAddon) {
+      // Clear the terminal and trigger a redraw
+      this.terminal.clear();
+      this.fitAddon.fit();
+      this.terminal.focus();
+      
+      // Send a simple command to refresh the prompt
+      this.sendTerminalInput('\r');
+    }
   }
 
   /**
@@ -490,6 +571,7 @@ export class SketchTerminal extends LitElement {
 
     const showReconnectButton = this.connectionState === 'error' || this.connectionState === 'disconnected';
     const isReconnecting = this.connectionState === 'connecting';
+    const showTerminalButtons = this.isInitialized; // Show buttons once terminal is initialized
 
     return html`
       <div id="terminalView" class="terminal-view">
@@ -499,14 +581,26 @@ export class SketchTerminal extends LitElement {
             <span>${statusText}</span>
             ${this.connectionError ? html`<span class="error-message">${this.connectionError}</span>` : ''}
           </div>
-          ${showReconnectButton ? html`
-            <button 
-              class="reconnect-button" 
-              @click=${this.reconnectTerminal}
-              ?disabled=${isReconnecting}
-            >
-              ${isReconnecting ? 'Connecting...' : 'Reconnect'}
-            </button>
+          ${showTerminalButtons ? html`
+            <div class="terminal-buttons">
+              <button 
+                class="terminal-button secondary" 
+                @click=${this.redrawTerminal}
+                title="Clear and redraw terminal"
+              >
+                Redraw
+              </button>
+              ${showReconnectButton ? html`
+                <button 
+                  class="terminal-button" 
+                  @click=${this.reconnectTerminal}
+                  ?disabled=${isReconnecting}
+                  title="Reconnect to terminal"
+                >
+                  ${isReconnecting ? 'Connecting...' : 'Reconnect'}
+                </button>
+              ` : ''}
+            </div>
           ` : ''}
         </div>
         <div id="terminalContainer" class="terminal-container"></div>
