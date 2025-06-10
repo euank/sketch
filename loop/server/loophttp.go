@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/pprof"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1272,6 +1273,30 @@ func (s *Server) handleSSEStream(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// SanitizeSkabandAddrForFrontend replaces docker.host.internal with localhost in URLs
+// for frontend consumption, since docker.host.internal is not resolvable from the user's browser
+func SanitizeSkabandAddrForFrontend(addr string) string {
+	if addr == "" {
+		return addr
+	}
+
+	u, err := url.Parse(addr)
+	if err != nil {
+		return addr // Return original if parsing fails
+	}
+
+	if u.Hostname() == "docker.host.internal" {
+		host := "localhost"
+		if port := u.Port(); port != "" {
+			host += ":" + port
+		}
+		u.Host = host
+		return u.String()
+	}
+
+	return addr
+}
+
 // Helper function to get the current state
 func (s *Server) getState() State {
 	serverMessageCount := s.agent.MessageCount()
@@ -1305,7 +1330,7 @@ func (s *Server) getState() State {
 		FirstMessageIndex:    s.agent.FirstMessageIndex(),
 		AgentState:           s.agent.CurrentStateName(),
 		TodoContent:          s.agent.CurrentTodoContent(),
-		SkabandAddr:          s.agent.SkabandAddr(),
+		SkabandAddr:          SanitizeSkabandAddrForFrontend(s.agent.SkabandAddr()),
 	}
 }
 
