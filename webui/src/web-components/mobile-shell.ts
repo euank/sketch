@@ -146,12 +146,23 @@ export class MobileShell extends LitElement {
       this.state?.outstanding_llm_calls > 0 ||
       (this.state?.outstanding_tool_calls?.length ?? 0) > 0;
 
+    // Find the most recent pushed branch from messages
+    const lastCommitWithPushedBranch = this.messages
+      .slice()
+      .reverse()
+      .find(msg => msg.commits && msg.commits.some(commit => commit?.pushed_branch))
+      ?.commits?.find(commit => commit?.pushed_branch);
+
     return html`
       <div class="mobile-container">
         <mobile-title
           .connectionStatus=${this.connectionStatus}
           .isThinking=${isThinking}
           .skabandAddr=${this.state?.skaband_addr}
+          .slug=${this.state?.slug}
+          .linkToGitHub=${this.state?.link_to_github}
+          .gitOrigin=${this.state?.git_origin}
+          .pushedBranch=${lastCommitWithPushedBranch?.pushed_branch}
         ></mobile-title>
 
         <mobile-chat
