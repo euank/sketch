@@ -553,6 +553,18 @@ export class SketchContainerStatus extends LitElement {
     );
   }
 
+  getSSHConnectionString() {
+    // Return the connection string for VS Code remote SSH
+    const connectionString = this.state?.ssh_connection_string || `sketch-${this.state?.session_id}`;
+    // If the connection string already contains user@, use it as-is
+    // Otherwise prepend root@ for VS Code remote SSH
+    if (connectionString.includes('@')) {
+      return connectionString;
+    } else {
+      return `root@${connectionString}`;
+    }
+  }
+
   // Format GitHub repository URL to org/repo format
   formatGitHubRepo(url) {
     if (!url) return null;
@@ -603,9 +615,10 @@ export class SketchContainerStatus extends LitElement {
     }
 
     const sshHost = this.getSSHHostname();
-    const sshCommand = `ssh ${sshHost}`;
-    const vscodeCommand = `code --remote ssh-remote+root@${sshHost} /app -n`;
-    const vscodeURL = `vscode://vscode-remote/ssh-remote+root@${sshHost}/app?windowId=_blank`;
+    const sshConnectionString = this.getSSHConnectionString();
+    const sshCommand = `ssh ${sshConnectionString}`;
+    const vscodeCommand = `code --remote ssh-remote+${sshConnectionString} /app -n`;
+    const vscodeURL = `vscode://vscode-remote/ssh-remote+${sshConnectionString}/app?windowId=_blank`;
 
     if (!this.state?.ssh_available) {
       return html`

@@ -561,8 +561,16 @@ func createDockerContainer(ctx context.Context, cntrName, hostPort, relPath, img
 		"-branch-prefix="+config.BranchPrefix,
 		"-link-to-github="+fmt.Sprintf("%t", config.LinkToGitHub),
 	)
-	// Set SSH connection string based on session ID for SSH Theater
-	cmdArgs = append(cmdArgs, "-ssh-connection-string=sketch-"+config.SessionID)
+	// Set SSH connection string for remote access
+	var sshConnectionString string
+	if config.SSHPort > 0 {
+		// When SSH port is available, provide the full connection string
+		sshConnectionString = fmt.Sprintf("root@%s@host.docker.internal:%d", config.SessionID, config.SSHPort)
+	} else {
+		// Fallback for SSH Theater mode
+		sshConnectionString = "sketch-" + config.SessionID
+	}
+	cmdArgs = append(cmdArgs, "-ssh-connection-string="+sshConnectionString)
 	if config.Model != "" {
 		cmdArgs = append(cmdArgs, "-model="+config.Model)
 	}
