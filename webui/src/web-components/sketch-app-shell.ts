@@ -816,6 +816,16 @@ export class SketchAppShell extends LitElement {
         });
         viewModeSelect.dispatchEvent(event);
       }
+
+      // Dispatch view-mode-select event for components that need to know about view changes
+      const viewModeEvent = new CustomEvent("view-mode-select", {
+        detail: { mode },
+        bubbles: true,
+        composed: true,
+      });
+      this.dispatchEvent(viewModeEvent);
+      // Also dispatch on window for global listeners
+      window.dispatchEvent(viewModeEvent);
     });
   }
 

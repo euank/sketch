@@ -175,7 +175,15 @@ export class SketchTerminal extends LitElement {
   }
 
   firstUpdated() {
-    // Do nothing - we'll initialize the terminal when it becomes visible
+    // Check if terminal should be initialized immediately (e.g. when loading with ?view=terminal)
+    setTimeout(() => {
+      const terminalView = this.closest('.terminal-view');
+      if (terminalView && terminalView.classList.contains('view-active') && !this.isInitialized) {
+        console.log('Terminal view is active on first update, initializing...');
+        this.isInitialized = true;
+        this.initializeTerminal();
+      }
+    }, 100);
   }
 
   _resizeHandler() {
@@ -333,14 +341,6 @@ export class SketchTerminal extends LitElement {
           try {
             // @ts-ignore This isn't in the type definitions yet; it's pretty new?!?
             const decoded = base64ToUint8Array(event.data);
-            const decodedText = new TextDecoder().decode(decoded);
-            
-            // Check for connection error messages in terminal output
-            if (decodedText.includes('Connection error') || decodedText.includes('connection error')) {
-              this.connectionState = 'error';
-              this.connectionError = 'Terminal connection lost';
-            }
-            
             this.terminal.write(decoded);
           } catch (e) {
             console.error("Error decoding terminal data:", e);
@@ -353,9 +353,10 @@ export class SketchTerminal extends LitElement {
         this.connectionState = 'error';
         this.connectionError = 'Connection lost';
         
-        if (this.terminal) {
-          this.terminal.write("\r\n\x1b[1;31mConnection error\x1b[0m\r\n");
-        }
+        // Don't write error message to terminal since we have status indicator
+        // if (this.terminal) {
+        //   this.terminal.write("\r\n\x1b[1;31mConnection error\x1b[0m\r\n");
+        // }
         
         // Clean up if the connection was closed
         if (this.terminalEventSource?.readyState === EventSource.CLOSED) {
