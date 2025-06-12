@@ -226,10 +226,9 @@ export class MobileChatInput extends LitElement {
   }
 
   private handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      this.sendMessage();
-    }
+    // On mobile, allow Enter key to create new lines
+    // Users should use the Send button explicitly to send messages
+    // This allows for better multi-line message composition on mobile devices
   };
 
   private adjustTextareaHeight() {
@@ -300,7 +299,7 @@ export class MobileChatInput extends LitElement {
             .value=${this.inputValue}
             @input=${this.handleInput}
             @keydown=${this.handleKeyDown}
-            placeholder="Message Sketch..."
+            placeholder="Type your message here and tap Send..."
             ?disabled=${this.disabled || this.uploadsInProgress > 0}
             rows="1"
           ></textarea>
