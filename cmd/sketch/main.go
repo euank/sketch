@@ -407,15 +407,14 @@ func runInHostMode(ctx context.Context, flags CLIFlags) error {
 		OneShot:           flags.oneShot,
 		Prompt:            flags.prompt,
 
-		Verbose:             flags.verbose,
-		DockerArgs:          flags.dockerArgs,
-		Mounts:              flags.mounts,
-		ExperimentFlag:      flags.experimentFlag.String(),
-		TermUI:              flags.termUI,
-		MaxDollars:          flags.maxDollars,
-		BranchPrefix:        flags.branchPrefix,
-		LinkToGitHub:        flags.linkToGitHub,
-		SSHConnectionString: fmt.Sprintf("sketch-%s", flags.sessionID),
+		Verbose:        flags.verbose,
+		DockerArgs:     flags.dockerArgs,
+		Mounts:         flags.mounts,
+		ExperimentFlag: flags.experimentFlag.String(),
+		TermUI:         flags.termUI,
+		MaxDollars:     flags.maxDollars,
+		BranchPrefix:   flags.branchPrefix,
+		LinkToGitHub:   flags.linkToGitHub,
 	}
 
 	if err := dockerimg.LaunchContainer(ctx, config); err != nil {

@@ -124,9 +124,6 @@ type ContainerConfig struct {
 
 	// LinkToGitHub enables GitHub branch linking in UI
 	LinkToGitHub bool
-
-	// SSH connection string for the container
-	SSHConnectionString string
 }
 
 // LaunchContainer creates a docker container for a project, installs sketch and opens a connection to it.
@@ -564,9 +561,8 @@ func createDockerContainer(ctx context.Context, cntrName, hostPort, relPath, img
 		"-branch-prefix="+config.BranchPrefix,
 		"-link-to-github="+fmt.Sprintf("%t", config.LinkToGitHub),
 	)
-	if config.SSHConnectionString != "" {
-		cmdArgs = append(cmdArgs, "-ssh-connection-string="+config.SSHConnectionString)
-	}
+	// Set SSH connection string based on session ID for SSH Theater
+	cmdArgs = append(cmdArgs, "-ssh-connection-string=sketch-"+config.SessionID)
 	if config.Model != "" {
 		cmdArgs = append(cmdArgs, "-model="+config.Model)
 	}
