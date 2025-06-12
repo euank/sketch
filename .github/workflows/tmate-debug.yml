@@ -1,0 +1,76 @@
+---
+name: tmate debug session
+
+# This workflow creates a tmate session for debugging the GitHub Actions
+# environment. Specifically useful for finding where Chrome and other tools
+# are installed. Based on: https://blog.philz.dev/blog/ci-debugging/
+
+'on':
+  workflow_dispatch:
+    inputs:
+      timeout_minutes:
+        description: 'Timeout in minutes (default: 30)'
+        required: false
+        default: '30'
+        type: string
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        with:
+          timeout-minutes: >
+            ${{ github.event.inputs.timeout_minutes || 30 }}
+          limit-access-to-actor: true
+        env:
+          # These environment variables will be available in debug session
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show environment info
+        run: |
+          echo "=== System Information ==="
+          uname -a
+          echo ""
+          echo "=== Available packages ==="
+          dpkg -l | grep -i chrome || echo "No Chrome packages found"
+          echo ""
+          echo "=== Searching for Chrome binaries ==="
+          find /usr /opt /snap -name "*chrome*" -type f 2>/dev/null |
+            head -20 || echo "Chrome binaries search completed"
+          echo ""
+          echo "=== Checking common Chrome locations ==="
+          ls -la /usr/bin/google-chrome* 2>/dev/null ||
+            echo "No Chrome in /usr/bin/"
+          ls -la /opt/google/chrome* 2>/dev/null ||
+            echo "No Chrome in /opt/google/"
+          ls -la /snap/bin/*chrome* 2>/dev/null ||
+            echo "No Chrome snap binaries"
+          echo ""
+          echo "=== PATH ==="
+          echo $PATH
+          echo ""
+          echo "=== Which commands ==="
+          which google-chrome 2>/dev/null ||
+            echo "google-chrome not in PATH"
+          which chromium-browser 2>/dev/null ||
+            echo "chromium-browser not in PATH"
+          which chrome 2>/dev/null || echo "chrome not in PATH"
+          echo ""
+          echo "=== Browser-related environment variables ==="
+          env | grep -i chrome || echo "No Chrome-related env vars"
+          env | grep -i browser || echo "No browser-related env vars"
+          echo ""
+          echo "=== Snap packages ==="
+          snap list 2>/dev/null | grep -i chrome ||
+            echo "No Chrome snap packages or snap not available"
+          echo ""
+          echo "=== Available browsers ==="
+          apt list --installed 2>/dev/null |
+            grep -E '(chrome|chromium|firefox)' ||
+            echo "No browsers found via apt list"
