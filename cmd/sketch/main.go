@@ -197,25 +197,26 @@ type CLIFlags struct {
 	forceRebuild bool
 	linkToGitHub bool
 
-	gitUsername       string
-	gitEmail          string
-	experimentFlag    experiment.Flag
-	sessionID         string
-	record            bool
-	noCleanup         bool
-	containerLogDest  string
-	outsideHostname   string
-	outsideOS         string
-	outsideWorkingDir string
-	sketchBinaryLinux string
-	dockerArgs        string
-	mounts            StringSliceFlag
-	termUI            bool
-	gitRemoteURL      string
-	upstream          string
-	commit            string
-	outsideHTTP       string
-	branchPrefix      string
+	gitUsername         string
+	gitEmail            string
+	experimentFlag      experiment.Flag
+	sessionID           string
+	record              bool
+	noCleanup           bool
+	containerLogDest    string
+	outsideHostname     string
+	outsideOS           string
+	outsideWorkingDir   string
+	sketchBinaryLinux   string
+	dockerArgs          string
+	mounts              StringSliceFlag
+	termUI              bool
+	gitRemoteURL        string
+	upstream            string
+	commit              string
+	outsideHTTP         string
+	branchPrefix        string
+	sshConnectionString string
 }
 
 // parseCLIFlags parses all command-line flags and returns a CLIFlags struct
@@ -265,6 +266,7 @@ func parseCLIFlags() CLIFlags {
 	internalFlags.StringVar(&flags.commit, "commit", "", "(internal) the git commit reference to check out from git remote url")
 	internalFlags.StringVar(&flags.outsideHTTP, "outside-http", "", "(internal) host for outside sketch")
 	internalFlags.BoolVar(&flags.linkToGitHub, "link-to-github", false, "(internal) enable GitHub branch linking in UI")
+	internalFlags.StringVar(&flags.sshConnectionString, "ssh-connection-string", "", "(internal) SSH connection string for connecting to the container")
 
 	// Developer flags
 	internalFlags.StringVar(&flags.httprrFile, "httprr", "", "if set, record HTTP interactions to file")
@@ -405,14 +407,15 @@ func runInHostMode(ctx context.Context, flags CLIFlags) error {
 		OneShot:           flags.oneShot,
 		Prompt:            flags.prompt,
 
-		Verbose:        flags.verbose,
-		DockerArgs:     flags.dockerArgs,
-		Mounts:         flags.mounts,
-		ExperimentFlag: flags.experimentFlag.String(),
-		TermUI:         flags.termUI,
-		MaxDollars:     flags.maxDollars,
-		BranchPrefix:   flags.branchPrefix,
-		LinkToGitHub:   flags.linkToGitHub,
+		Verbose:             flags.verbose,
+		DockerArgs:          flags.dockerArgs,
+		Mounts:              flags.mounts,
+		ExperimentFlag:      flags.experimentFlag.String(),
+		TermUI:              flags.termUI,
+		MaxDollars:          flags.maxDollars,
+		BranchPrefix:        flags.branchPrefix,
+		LinkToGitHub:        flags.linkToGitHub,
+		SSHConnectionString: fmt.Sprintf("sketch-%s", flags.sessionID),
 	}
 
 	if err := dockerimg.LaunchContainer(ctx, config); err != nil {
@@ -523,14 +526,15 @@ func setupAndRunAgent(ctx context.Context, flags CLIFlags, modelURL, apiKey, pub
 		WorkingDir:        wd,
 		// Ultimately this is a subtle flag because it's trying to distinguish
 		// between unsafe-on-host and inside sketch, and should probably be renamed/simplified.
-		InDocker:      flags.outsideHostname != "",
-		OneShot:       flags.oneShot,
-		GitRemoteAddr: flags.gitRemoteURL,
-		Upstream:      flags.upstream,
-		OutsideHTTP:   flags.outsideHTTP,
-		Commit:        flags.commit,
-		BranchPrefix:  flags.branchPrefix,
-		LinkToGitHub:  flags.linkToGitHub,
+		InDocker:            flags.outsideHostname != "",
+		OneShot:             flags.oneShot,
+		GitRemoteAddr:       flags.gitRemoteURL,
+		Upstream:            flags.upstream,
+		OutsideHTTP:         flags.outsideHTTP,
+		Commit:              flags.commit,
+		BranchPrefix:        flags.branchPrefix,
+		LinkToGitHub:        flags.linkToGitHub,
+		SSHConnectionString: flags.sshConnectionString,
 	}
 
 	// Create SkabandClient if skaband address is provided

@@ -115,6 +115,9 @@ type CodingAgent interface {
 	// SessionID returns the unique session identifier.
 	SessionID() string
 
+	// SSHConnectionString returns the SSH connection string for the container.
+	SSHConnectionString() string
+
 	// DetectGitChanges checks for new git commits and pushes them if found
 	DetectGitChanges(ctx context.Context) error
 
@@ -678,6 +681,11 @@ func (a *Agent) SessionID() string {
 	return a.config.SessionID
 }
 
+// SSHConnectionString returns the SSH connection string for the container.
+func (a *Agent) SSHConnectionString() string {
+	return a.config.SSHConnectionString
+}
+
 // OutsideOS returns the operating system of the outside system.
 func (a *Agent) OutsideOS() string {
 	return a.outsideOS
@@ -997,6 +1005,8 @@ type AgentConfig struct {
 	BranchPrefix string
 	// LinkToGitHub enables GitHub branch linking in UI
 	LinkToGitHub bool
+	// SSH connection string for connecting to the container
+	SSHConnectionString string
 	// Skaband client for session history (optional)
 	SkabandClient *skabandclient.SkabandClient
 }

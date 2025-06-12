@@ -547,7 +547,8 @@ export class SketchContainerStatus extends LitElement {
   }
 
   getSSHHostname() {
-    return `sketch-${this.state?.session_id}`;
+    // Use the ssh_connection_string from the state if available, otherwise fall back to generating it
+    return this.state?.ssh_connection_string || `sketch-${this.state?.session_id}`;
   }
 
   // Format GitHub repository URL to org/repo format

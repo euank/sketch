@@ -90,6 +90,7 @@ export interface State {
 	todo_content?: string;
 	skaband_addr?: string;
 	link_to_github?: boolean;
+	ssh_connection_string?: string;
 }
 
 export interface TodoItem {

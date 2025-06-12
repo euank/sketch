@@ -229,6 +229,7 @@ func (m *mockAgent) RepoRoot() string                            { return m.work
 func (m *mockAgent) Diff(commit *string) (string, error)         { return "", nil }
 func (m *mockAgent) OS() string                                  { return "linux" }
 func (m *mockAgent) SessionID() string                           { return m.sessionID }
+func (m *mockAgent) SSHConnectionString() string                 { return "sketch-" + m.sessionID }
 func (m *mockAgent) BranchPrefix() string                        { return m.branchPrefix }
 func (m *mockAgent) CurrentTodoContent() string                  { return "" } // Mock returns empty for simplicity
 func (m *mockAgent) OutstandingLLMCallCount() int                { return 0 }
