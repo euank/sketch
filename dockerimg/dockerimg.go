@@ -753,11 +753,20 @@ func findOrBuildDockerImage(ctx context.Context, cwd, gitRoot, model, modelURL, 
 	h := sha256.Sum256([]byte(gitRoot))
 	imgName = "sketch-" + hex.EncodeToString(h[:6])
 
+	slog.Info("Docker image lookup starting",
+		slog.String("image_name", imgName),
+		slog.String("git_root", gitRoot),
+		slog.String("cwd", cwd),
+		slog.String("git_root_hash", hex.EncodeToString(h[:])),
+		slog.Bool("force_rebuild", forceRebuild))
+
 	var curImgInitFilesHash string
 	if out, err := combinedOutput(ctx, "docker", "inspect", "--format", "{{json .Config.Labels}}", imgName); err != nil {
 		if strings.Contains(string(out), "No such object") {
 			// Image does not exist, continue and build it.
 			curImgInitFilesHash = ""
+			slog.Info("Docker image not found, will build new image",
+				slog.String("image_name", imgName))
 		} else {
 			return "", fmt.Errorf("docker inspect failed: %s, %v", out, err)
 		}
@@ -767,6 +776,10 @@ func findOrBuildDockerImage(ctx context.Context, cwd, gitRoot, model, modelURL, 
 			return "", fmt.Errorf("docker inspect output unparsable: %s, %v", out, err)
 		}
 		curImgInitFilesHash = m["sketch_context"]
+		slog.Info("Docker image found, checking cache validity",
+			slog.String("image_name", imgName),
+			slog.String("current_hash", curImgInitFilesHash),
+			slog.Any("all_labels", m))
 	}
 
 	candidates, err := findRepoDockerfiles(cwd, gitRoot)
@@ -786,9 +799,26 @@ func findOrBuildDockerImage(ctx context.Context, cwd, gitRoot, model, modelURL, 
 			return "", err
 		}
 		fmt.Printf("using %s as dev env\n", dockerfilePath)
-		if hashInitFiles(map[string]string{dockerfilePath: string(contents)}) == curImgInitFilesHash && !forceRebuild {
+		newHash := hashInitFiles(map[string]string{dockerfilePath: string(contents)})
+		slog.Info("Docker cache check for existing Dockerfile",
+			slog.String("dockerfile_path", dockerfilePath),
+			slog.String("new_hash", newHash),
+			slog.String("current_hash", curImgInitFilesHash),
+			slog.Bool("hashes_match", newHash == curImgInitFilesHash),
+			slog.Bool("force_rebuild", forceRebuild))
+		if newHash == curImgInitFilesHash && !forceRebuild {
+			slog.Info("Docker cache HIT - using existing image",
+				slog.String("image_name", imgName))
 			return imgName, nil
 		}
+		slog.Info("Docker cache MISS - will rebuild image",
+			slog.String("image_name", imgName),
+			slog.String("reason", func() string {
+				if forceRebuild {
+					return "force_rebuild_requested"
+				}
+				return "hash_mismatch"
+			}()))
 	} else {
 		initFiles, err = readInitFiles(os.DirFS(gitRoot))
 		if err != nil {
@@ -799,9 +829,25 @@ func findOrBuildDockerImage(ctx context.Context, cwd, gitRoot, model, modelURL, 
 			return "", err
 		}
 		initFileHash := hashInitFiles(initFiles)
+		slog.Info("Docker cache check for generated Dockerfile",
+			slog.String("new_hash", initFileHash),
+			slog.String("current_hash", curImgInitFilesHash),
+			slog.Bool("hashes_match", curImgInitFilesHash == initFileHash),
+			slog.Bool("force_rebuild", forceRebuild),
+			slog.String("sub_path_working_dir", subPathWorkingDir))
 		if curImgInitFilesHash == initFileHash && !forceRebuild {
+			slog.Info("Docker cache HIT - using existing image",
+				slog.String("image_name", imgName))
 			return imgName, nil
 		}
+		slog.Info("Docker cache MISS - will generate and build new image",
+			slog.String("image_name", imgName),
+			slog.String("reason", func() string {
+				if forceRebuild {
+					return "force_rebuild_requested"
+				}
+				return "hash_mismatch"
+			}()))
 
 		if model == "gemini" {
 			if strings.HasSuffix(modelURL, "/gemmsgs") {
@@ -881,6 +927,9 @@ func findOrBuildDockerImage(ctx context.Context, cwd, gitRoot, model, modelURL, 
 		return "", fmt.Errorf("docker build failed: %v%s", err, msg)
 	}
 	fmt.Printf("built docker image %s in %s\n", imgName, time.Since(start).Round(time.Millisecond))
+	slog.Info("Docker image build completed",
+		slog.String("image_name", imgName),
+		slog.Duration("build_time", time.Since(start)))
 	return imgName, nil
 }
 

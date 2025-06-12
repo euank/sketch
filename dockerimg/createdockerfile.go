@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"maps"
 	"net/http"
 	"slices"
@@ -20,13 +21,37 @@ import (
 	"sketch.dev/llm/conversation"
 )
 
+// HashInitFiles exposes the hash calculation for testing
+func HashInitFiles(initFiles map[string]string) string {
+	return hashInitFiles(initFiles)
+}
+
 func hashInitFiles(initFiles map[string]string) string {
 	h := sha256.New()
 	for _, path := range slices.Sorted(maps.Keys(initFiles)) {
 		fmt.Fprintf(h, "%s\n%s\n\n", path, initFiles[path])
 	}
 	fmt.Fprintf(h, "docker template\n%s\n", dockerfileDefaultTmpl)
-	return hex.EncodeToString(h.Sum(nil))
+	hash := hex.EncodeToString(h.Sum(nil))
+
+	// Log hash inputs for debugging cache misses
+	files := slices.Sorted(maps.Keys(initFiles))
+	slog.Info("Docker cache hash calculation",
+		slog.String("final_hash", hash),
+		slog.Int("num_init_files", len(initFiles)),
+		slog.Any("init_file_paths", files),
+		slog.String("dockerfile_template_hash", fmt.Sprintf("%x", sha256.Sum256([]byte(dockerfileDefaultTmpl)))))
+
+	// Log individual file hashes for detailed debugging
+	for _, path := range files {
+		fileHash := sha256.Sum256([]byte(initFiles[path]))
+		slog.Info("Docker cache init file hash",
+			slog.String("file_path", path),
+			slog.String("file_hash", hex.EncodeToString(fileHash[:])),
+			slog.Int("file_size", len(initFiles[path])))
+	}
+
+	return hash
 }
 
 // DefaultImage is intended to ONLY be used by the pushdockerimg.go script.
@@ -42,7 +67,14 @@ const (
 func dockerfileBaseHash() string {
 	h := sha256.New()
 	io.WriteString(h, dockerfileBase)
-	return hex.EncodeToString(h.Sum(nil))[:32]
+	hash := hex.EncodeToString(h.Sum(nil))[:32]
+
+	slog.Info("Docker base image hash calculation",
+		slog.String("base_hash", hash),
+		slog.String("base_image_name", dockerImgName),
+		slog.Int("dockerfile_base_size", len(dockerfileBase)))
+
+	return hash
 }
 
 const tmpSketchDockerfile = "tmp-sketch-dockerfile"
@@ -272,6 +304,8 @@ In particular:
 func readInitFiles(fsys fs.FS) (map[string]string, error) {
 	result := make(map[string]string)
 
+	slog.Info("Reading init files for Docker context")
+
 	err := fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -293,6 +327,9 @@ func readInitFiles(fsys fs.FS) (map[string]string, error) {
 				return err
 			}
 			result[path] = string(content)
+			slog.Info("Added README file to Docker context",
+				slog.String("path", path),
+				slog.Int("size", len(content)))
 			return nil
 		}
 
@@ -303,6 +340,9 @@ func readInitFiles(fsys fs.FS) (map[string]string, error) {
 				return err
 			}
 			result[path] = string(content)
+			slog.Info("Added GitHub workflow file to Docker context",
+				slog.String("path", path),
+				slog.Int("size", len(content)))
 			return nil
 		}
 
@@ -311,5 +351,10 @@ func readInitFiles(fsys fs.FS) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	slog.Info("Finished reading init files for Docker context",
+		slog.Int("total_files", len(result)),
+		slog.Any("file_paths", slices.Sorted(maps.Keys(result))))
+
 	return result, nil
 }
