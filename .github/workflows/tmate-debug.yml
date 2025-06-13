@@ -1,11 +1,10 @@
----
 name: tmate debug session
 
 # This workflow creates a tmate session for debugging the GitHub Actions
 # environment. Specifically useful for finding where Chrome and other tools
 # are installed. Based on: https://blog.philz.dev/blog/ci-debugging/
 
-'on':
+on:
   workflow_dispatch:
     inputs:
       timeout_minutes:
