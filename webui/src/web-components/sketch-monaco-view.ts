@@ -161,7 +161,7 @@ export class CodeDiffEditor extends LitElement {
       },
     );
 
-    console.log("Keyboard shortcuts set up for Monaco editor");
+
   }
 
   // Setup content change listener for debounced save
@@ -639,7 +639,7 @@ export class CodeDiffEditor extends LitElement {
           },
         });
 
-        console.log("Monaco diff editor created");
+
 
         // Set up selection change event listeners for both editors
         this.setupSelectionChangeListeners();
@@ -669,7 +669,7 @@ export class CodeDiffEditor extends LitElement {
         if (this.editor) {
           monaco.editor.remeasureFonts();
           this.editor.layout();
-          console.log("Monaco fonts remeasured and layout updated");
+
         }
       });
 
@@ -678,11 +678,11 @@ export class CodeDiffEditor extends LitElement {
       setTimeout(() => {
         if (this.editor) {
           this.editor.layout();
-          console.log("Monaco diff editor layout updated");
+
         }
       }, 50);
 
-      console.log("Monaco diff editor initialized");
+
     } catch (error) {
       console.error("Error initializing Monaco editor:", error);
     }
@@ -696,7 +696,7 @@ export class CodeDiffEditor extends LitElement {
   private setupSelectionChangeListeners() {
     try {
       if (!this.editor) {
-        console.log("Editor not available for setting up listeners");
+
         return;
       }
 
@@ -705,7 +705,7 @@ export class CodeDiffEditor extends LitElement {
       const modifiedEditor = this.editor.getModifiedEditor();
 
       if (!originalEditor || !modifiedEditor) {
-        console.log("Original or modified editor not available");
+
         return;
       }
 
@@ -776,7 +776,7 @@ export class CodeDiffEditor extends LitElement {
       // Add the document click listener
       document.addEventListener("click", this._documentClickHandler);
 
-      console.log("Selection change listeners set up successfully");
+
     } catch (error) {
       console.error("Error setting up selection listeners:", error);
     }
@@ -811,7 +811,7 @@ export class CodeDiffEditor extends LitElement {
       // Get selected text
       const model = editor.getModel();
       if (!model) {
-        console.log("No model available for selection");
+
         return;
       }
 
@@ -821,7 +821,7 @@ export class CodeDiffEditor extends LitElement {
         e.selection.startLineNumber > lineCount ||
         e.selection.endLineNumber > lineCount
       ) {
-        console.log("Selection out of bounds");
+
         return;
       }
 
@@ -867,7 +867,7 @@ export class CodeDiffEditor extends LitElement {
           // Use the editor's DOM node as positioning context
           const editorDomNode = editor.getDomNode();
           if (!editorDomNode) {
-            console.log("No editor DOM node available");
+
             return;
           }
 
@@ -966,7 +966,7 @@ export class CodeDiffEditor extends LitElement {
   private submitComment() {
     try {
       if (!this.selectedText || !this.commentText) {
-        console.log("Missing selected text or comment");
+
         return;
       }
 
@@ -1161,21 +1161,17 @@ export class CodeDiffEditor extends LitElement {
           monaco: monaco,
           editors: [],
           remeasureFonts: () => {
-            console.log('Remeasuring fonts for all Monaco editors...');
             monaco.editor.remeasureFonts();
             (window as any).sketchDebug.editors.forEach((editor: any, index: number) => {
               if (editor && editor.layout) {
                 editor.layout();
-                console.log(`Layouted editor ${index}`);
               }
             });
           },
           layoutAll: () => {
-            console.log('Laying out all Monaco editors...');
             (window as any).sketchDebug.editors.forEach((editor: any, index: number) => {
               if (editor && editor.layout) {
                 editor.layout();
-                console.log(`Layouted editor ${index}`);
               }
             });
           },
@@ -1183,13 +1179,13 @@ export class CodeDiffEditor extends LitElement {
             return (window as any).sketchDebug.editors.filter((editor: any) => editor !== null);
           }
         };
-        console.log('sketchDebug global initialized. Available methods:', Object.keys((window as any).sketchDebug));
+
       }
 
       // Add this editor to the debug collection
       if (this.editor) {
         (window as any).sketchDebug.editors.push(this.editor);
-        console.log(`Added Monaco diff editor to sketchDebug.editors[${(window as any).sketchDebug.editors.length - 1}]`);
+
       }
     } catch (error) {
       console.error('Error adding Monaco editor to debug global:', error);
@@ -1205,7 +1201,7 @@ export class CodeDiffEditor extends LitElement {
         const index = (window as any).sketchDebug.editors.indexOf(this.editor);
         if (index > -1) {
           (window as any).sketchDebug.editors[index] = null;
-          console.log(`Removed Monaco diff editor from sketchDebug.editors[${index}]`);
+
         }
       }
 
