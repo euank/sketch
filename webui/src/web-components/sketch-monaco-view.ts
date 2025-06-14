@@ -609,13 +609,15 @@ export class CodeDiffEditor extends LitElement {
 
   private initializeEditor() {
     try {
-      // Disable semantic validation globally for TypeScript/JavaScript
-      monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
-        noSemanticValidation: true,
-      });
-      monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
-        noSemanticValidation: true,
-      });
+      // Disable semantic validation globally for TypeScript/JavaScript if available
+      if (monaco.languages && monaco.languages.typescript) {
+        monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+          noSemanticValidation: true,
+        });
+        monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+          noSemanticValidation: true,
+        });
+      }
 
       // First time initialization
       if (!this.editor) {
@@ -651,12 +653,25 @@ export class CodeDiffEditor extends LitElement {
           // Make sure the modified editor is editable
           this.editor.getModifiedEditor().updateOptions({ readOnly: false });
         }
+
+        // Add Monaco editor to debug global
+        this.addToDebugGlobal();
       }
 
       // Create or update models
       this.updateModels();
       // Set up content change listener
       this.setupContentChangeListener();
+
+      // Fix cursor positioning issues by ensuring fonts are loaded
+      // This addresses the common Monaco editor cursor offset problem
+      document.fonts.ready.then(() => {
+        if (this.editor) {
+          monaco.editor.remeasureFonts();
+          this.editor.layout();
+          console.log("Monaco fonts remeasured and layout updated");
+        }
+      });
 
       // Force layout recalculation after a short delay
       // This ensures the editor renders properly, especially with single files
@@ -1134,10 +1149,66 @@ export class CodeDiffEditor extends LitElement {
 
   private _resizeObserver: ResizeObserver | null = null;
 
+  /**
+   * Add this Monaco editor instance to the global debug object
+   * This allows inspection and debugging via browser console
+   */
+  private addToDebugGlobal() {
+    try {
+      // Initialize the debug global if it doesn't exist
+      if (!(window as any).sketchDebug) {
+        (window as any).sketchDebug = {
+          monaco: monaco,
+          editors: [],
+          remeasureFonts: () => {
+            console.log('Remeasuring fonts for all Monaco editors...');
+            monaco.editor.remeasureFonts();
+            (window as any).sketchDebug.editors.forEach((editor: any, index: number) => {
+              if (editor && editor.layout) {
+                editor.layout();
+                console.log(`Layouted editor ${index}`);
+              }
+            });
+          },
+          layoutAll: () => {
+            console.log('Laying out all Monaco editors...');
+            (window as any).sketchDebug.editors.forEach((editor: any, index: number) => {
+              if (editor && editor.layout) {
+                editor.layout();
+                console.log(`Layouted editor ${index}`);
+              }
+            });
+          },
+          getActiveEditors: () => {
+            return (window as any).sketchDebug.editors.filter((editor: any) => editor !== null);
+          }
+        };
+        console.log('sketchDebug global initialized. Available methods:', Object.keys((window as any).sketchDebug));
+      }
+
+      // Add this editor to the debug collection
+      if (this.editor) {
+        (window as any).sketchDebug.editors.push(this.editor);
+        console.log(`Added Monaco diff editor to sketchDebug.editors[${(window as any).sketchDebug.editors.length - 1}]`);
+      }
+    } catch (error) {
+      console.error('Error adding Monaco editor to debug global:', error);
+    }
+  }
+
   disconnectedCallback() {
     super.disconnectedCallback();
 
     try {
+      // Remove editor from debug global before disposal
+      if (this.editor && (window as any).sketchDebug?.editors) {
+        const index = (window as any).sketchDebug.editors.indexOf(this.editor);
+        if (index > -1) {
+          (window as any).sketchDebug.editors[index] = null;
+          console.log(`Removed Monaco diff editor from sketchDebug.editors[${index}]`);
+        }
+      }
+
       // Clean up resources when element is removed
       if (this.editor) {
         this.editor.dispose();

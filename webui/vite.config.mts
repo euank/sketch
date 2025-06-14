@@ -108,9 +108,7 @@ export default defineConfig({
   },
   // Configure Monaco Editor
   resolve: {
-    alias: {
-      "monaco-editor": "monaco-editor/esm/vs/editor/editor.api",
-    },
+    // No alias needed, use default Monaco import
   },
   optimizeDeps: {
     include: ["monaco-editor"],
