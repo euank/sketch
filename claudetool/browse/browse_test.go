@@ -18,6 +18,9 @@ import (
 func TestToolCreation(t *testing.T) {
 	// Create browser tools instance
 	tools := NewBrowseTools(context.Background())
+	t.Cleanup(func() {
+		tools.Close()
+	})
 
 	// Test each tool has correct name and description
 	toolTests := []struct {
@@ -68,6 +71,9 @@ func TestToolCreation(t *testing.T) {
 func TestGetTools(t *testing.T) {
 	// Create browser tools instance
 	tools := NewBrowseTools(context.Background())
+	t.Cleanup(func() {
+		tools.Close()
+	})
 
 	// Test with screenshot tools included
 	t.Run("with screenshots", func(t *testing.T) {
@@ -102,10 +108,13 @@ func TestBrowserInitialization(t *testing.T) {
 	}
 
 	// Create browser tools instance
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	tools := NewBrowseTools(ctx)
+	t.Cleanup(func() {
+		tools.Close()
+	})
 
 	// Initialize the browser
 	err := tools.Initialize()
@@ -117,9 +126,6 @@ func TestBrowserInitialization(t *testing.T) {
 			t.Fatalf("Failed to initialize browser: %v", err)
 		}
 	}
-
-	// Clean up
-	defer tools.Close()
 
 	// Get browser context to verify it's working
 	browserCtx, err := tools.GetBrowserContext()
@@ -148,11 +154,13 @@ func TestNavigateTool(t *testing.T) {
 	}
 
 	// Create browser tools instance
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	tools := NewBrowseTools(ctx)
-	defer tools.Close()
+	t.Cleanup(func() {
+		tools.Close()
+	})
 
 	// Check if browser initialization works
 	if err := tools.Initialize(); err != nil {
@@ -222,6 +230,9 @@ func TestScreenshotTool(t *testing.T) {
 	// Create browser tools instance
 	ctx := context.Background()
 	tools := NewBrowseTools(ctx)
+	t.Cleanup(func() {
+		tools.Close()
+	})
 
 	// Test SaveScreenshot function directly
 	testData := []byte("test image data")
@@ -256,6 +267,9 @@ func TestReadImageTool(t *testing.T) {
 	// Create a test BrowseTools instance
 	ctx := context.Background()
 	browseTools := NewBrowseTools(ctx)
+	t.Cleanup(func() {
+		browseTools.Close()
+	})
 
 	// Create a test image
 	testDir := t.TempDir()
@@ -308,7 +322,7 @@ func TestReadImageTool(t *testing.T) {
 
 // TestDefaultViewportSize verifies that the browser starts with the correct default viewport size
 func TestDefaultViewportSize(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// Skip if CI or headless testing environment
@@ -317,7 +331,9 @@ func TestDefaultViewportSize(t *testing.T) {
 	}
 
 	tools := NewBrowseTools(ctx)
-	defer tools.Close()
+	t.Cleanup(func() {
+		tools.Close()
+	})
 
 	// Initialize browser (which should set default viewport to 1280x720)
 	err := tools.Initialize()
@@ -375,7 +391,7 @@ func TestDefaultViewportSize(t *testing.T) {
 
 // TestResizeTool tests the browser resize functionality
 func TestResizeTool(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// Skip if CI or headless testing environment
@@ -385,7 +401,9 @@ func TestResizeTool(t *testing.T) {
 
 	t.Run("ResizeWindow", func(t *testing.T) {
 		tools := NewBrowseTools(ctx)
-		defer tools.Close()
+		t.Cleanup(func() {
+			tools.Close()
+		})
 
 		// Resize to mobile dimensions
 		resizeTool := tools.NewResizeTool()

@@ -75,10 +75,15 @@ func (b *BrowseTools) Initialize() error {
 		// when running in a container, even when we aren't root (which is largely
 		// the case for tests).
 		opts = append(opts, chromedp.NoSandbox)
+		// Setting 'DBUS_SESSION_BUS_ADDRESS=""' or this flag allows tests to pass
+		// in GitHub runner contexts. It's a mystery why the failure isn't clear when this fails.
+		opts = append(opts, chromedp.Flag("--disable-dbus", true))
+		// This can be pretty slow in tests
+		opts = append(opts, chromedp.WSURLReadTimeout(30*time.Second))
 		allocCtx, _ := chromedp.NewExecAllocator(b.ctx, opts...)
 		browserCtx, browserCancel := chromedp.NewContext(
 			allocCtx,
-			chromedp.WithLogf(log.Printf),
+			chromedp.WithLogf(log.Printf), chromedp.WithErrorf(log.Printf), chromedp.WithBrowserOption(chromedp.WithDialTimeout(30*time.Second)),
 		)
 
 		b.browserCtx = browserCtx

@@ -44,9 +44,20 @@ jobs:
           go install mvdan.cc/gofumpt@latest
           go install golang.org/x/tools/cmd/goimports@latest
           # Empirically (by logging into runners with tmate), there are versions of Chromium/Chrome in /opt/google/chrome
-          # and /usr/local/share/chromium/chrome-linux. However, adding them to the PATH
-          # hasn't worked yet. I don't know why.
-          sudo apt-get update && sudo apt-get -y install chromium
+          # and /usr/local/share/chromium/chrome-linux, and /usr/bin/chromium links to the former. Therefore, we
+          # don't need to apt-get it separately.
+          
+      # If you wish to do some interactive debugging, the following is handy. It will print
+      # an SSH command that you can use to connect to the runner instance.
+      - name: tmate debugging (disabled)
+        if: false
+        run: |
+          sudo apt-get update && sudo apt-get install -y tmate
+          set -x
+          tmate -S /tmp/tmate.sock.${GITHUB_RUN_ID} new-session -d
+          tmate -S /tmp/tmate.sock.${GITHUB_RUN_ID} wait tmate-ready
+          tmate -S /tmp/tmate.sock.${GITHUB_RUN_ID} display -p '#{tmate_ssh}'
+          sleep 1800
 
       - name: Go generate
         run: |
