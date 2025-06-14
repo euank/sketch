@@ -22,15 +22,16 @@ func _() {
 	_ = x[StateCheckingBudget-11]
 	_ = x[StateGatheringAdditionalMessages-12]
 	_ = x[StateSendingToolResults-13]
-	_ = x[StateCancelled-14]
-	_ = x[StateBudgetExceeded-15]
-	_ = x[StateError-16]
-	_ = x[StateCompacting-17]
+	_ = x[StateSendingContinueMessage-14]
+	_ = x[StateCancelled-15]
+	_ = x[StateBudgetExceeded-16]
+	_ = x[StateError-17]
+	_ = x[StateCompacting-18]
 }
 
-const _State_name = "UnknownReadyWaitingForUserInputSendingToLLMProcessingLLMResponseEndOfTurnToolUseRequestedCheckingForCancellationRunningToolCheckingGitCommitsRunningAutoformattersCheckingBudgetGatheringAdditionalMessagesSendingToolResultsCancelledBudgetExceededErrorCompacting"
+const _State_name = "UnknownReadyWaitingForUserInputSendingToLLMProcessingLLMResponseEndOfTurnToolUseRequestedCheckingForCancellationRunningToolCheckingGitCommitsRunningAutoformattersCheckingBudgetGatheringAdditionalMessagesSendingToolResultsSendingContinueMessageCancelledBudgetExceededErrorCompacting"
 
-var _State_index = [...]uint16{0, 7, 12, 31, 43, 64, 73, 89, 112, 123, 141, 162, 176, 203, 221, 230, 244, 249, 259}
+var _State_index = [...]uint16{0, 7, 12, 31, 43, 64, 73, 89, 112, 123, 141, 162, 176, 203, 221, 243, 252, 266, 271, 281}
 
 func (i State) String() string {
 	if i < 0 || i >= State(len(_State_index)-1) {

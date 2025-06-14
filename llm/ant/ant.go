@@ -437,8 +437,6 @@ func (s *Service) Do(ctx context.Context, ir *llm.Request) (*llm.Response, error
 	}
 
 	backoff := []time.Duration{15 * time.Second, 30 * time.Second, time.Minute}
-	largerMaxTokens := false
-	var partialUsage usage
 
 	url := cmp.Or(s.URL, DefaultURL)
 	httpc := cmp.Or(s.HTTPC, http.DefaultClient)
@@ -470,10 +468,6 @@ func (s *Service) Do(ctx context.Context, ir *llm.Request) (*llm.Response, error
 		if request.TokenEfficientToolUse {
 			features = append(features, "token-efficient-tool-use-2025-02-19")
 		}
-		if largerMaxTokens {
-			features = append(features, "output-128k-2025-02-19")
-			request.MaxTokens = 128 * 1024
-		}
 		if len(features) > 0 {
 			req.Header.Set("anthropic-beta", strings.Join(features, ","))
 		}
@@ -504,19 +498,12 @@ func (s *Service) Do(ctx context.Context, ir *llm.Request) (*llm.Response, error
 			if err != nil {
 				return nil, errors.Join(errs, err)
 			}
-			if response.StopReason == "max_tokens" && !largerMaxTokens {
-				slog.InfoContext(ctx, "anthropic_retrying_with_larger_tokens", "message", "Retrying Anthropic API call with larger max tokens size")
-				// Retry with more output tokens.
-				largerMaxTokens = true
-				response.Usage.CostUSD = llm.CostUSDFromResponse(resp.Header)
-				partialUsage = response.Usage
-				continue
+			// No longer retry with larger tokens - return the response to the agent loop
+			if response.StopReason == "max_tokens" {
+				slog.InfoContext(ctx, "anthropic_max_tokens_reached", "message", "Max tokens reached, returning to agent loop")
 			}
 
 			// Calculate and set the cost_usd field
-			if largerMaxTokens {
-				response.Usage.Add(partialUsage)
-			}
 			response.Usage.CostUSD = llm.CostUSDFromResponse(resp.Header)
 
 			return toLLMResponse(&response), nil

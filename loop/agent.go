@@ -1548,30 +1548,59 @@ func (a *Agent) processTurn(ctx context.Context) error {
 			return nil
 		}
 
-		// If the model is not requesting to use a tool, we're done
-		if resp.StopReason != llm.StopReasonToolUse {
+		// Handle different stop reasons
+		switch resp.StopReason {
+		case llm.StopReasonToolUse:
+			// Transition to tool use requested state
+			a.stateMachine.Transition(ctx, StateToolUseRequested, "LLM requested tool use")
+
+			// Handle tool execution
+			continueConversation, toolResp := a.handleToolExecution(ctx, resp)
+			if !continueConversation {
+				return nil
+			}
+
+			if toolResp == nil {
+				return fmt.Errorf("cannot continue conversation with a nil tool response")
+			}
+
+			// Set the response for the next iteration
+			resp = toolResp
+		case llm.StopReasonMaxTokens:
+			// Handle max tokens by continuing the conversation
+			a.stateMachine.Transition(ctx, StateProcessingLLMResponse, "Max tokens reached, continuing conversation")
+
+			// First execute any tools if present in the partial response
+			if hasToolCalls(resp) {
+				// Handle tool execution first
+				continueConversation, toolResp := a.handleToolExecution(ctx, resp)
+				if !continueConversation {
+					return nil
+				}
+				resp = toolResp
+				continue
+			}
+
+			// Send continue message to get the rest of the response
+			a.stateMachine.Transition(ctx, StateSendingContinueMessage, "Sending continue message for max tokens")
+			continueResp, err := a.convo.SendMessage(llm.Message{
+				Role:    llm.MessageRoleUser,
+				Content: []llm.Content{{Type: llm.ContentTypeText, Text: "Please continue."}},
+			})
+			if err != nil {
+				a.stateMachine.Transition(ctx, StateError, "Error sending continue message: "+err.Error())
+				a.pushToOutbox(ctx, errorMessage(fmt.Errorf("error: failed to continue conversation: %s", err.Error())))
+				return nil
+			}
+
+			a.stateMachine.Transition(ctx, StateProcessingLLMResponse, "Processing LLM response to continue message")
+			resp = continueResp
+		default:
+			// All other stop reasons end the turn
 			a.stateMachine.Transition(ctx, StateEndOfTurn, "LLM completed response, ending turn")
-			break
-		}
-
-		// Transition to tool use requested state
-		a.stateMachine.Transition(ctx, StateToolUseRequested, "LLM requested tool use")
-
-		// Handle tool execution
-		continueConversation, toolResp := a.handleToolExecution(ctx, resp)
-		if !continueConversation {
 			return nil
 		}
-
-		if toolResp == nil {
-			return fmt.Errorf("cannot continue conversation with a nil tool response")
-		}
-
-		// Set the response for the next iteration
-		resp = toolResp
 	}
-
-	return nil
 }
 
 // processUserMessage waits for user messages and sends them to the model
@@ -2395,4 +2424,17 @@ func (a *Agent) SkabandAddr() string {
 		return a.config.SkabandClient.Addr()
 	}
 	return ""
+}
+
+// hasToolCalls checks if an LLM response contains any tool calls
+func hasToolCalls(resp *llm.Response) bool {
+	if resp == nil {
+		return false
+	}
+	for _, part := range resp.Content {
+		if part.Type == llm.ContentTypeToolUse {
+			return true
+		}
+	}
+	return false
 }

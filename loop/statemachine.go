@@ -41,6 +41,8 @@ const (
 	StateGatheringAdditionalMessages
 	// StateSendingToolResults occurs when the agent sends tool results back to the LLM
 	StateSendingToolResults
+	// StateSendingContinueMessage occurs when the agent sends a continue message after max tokens
+	StateSendingContinueMessage
 	// StateCancelled occurs when an operation was cancelled by the user
 	StateCancelled
 	// StateBudgetExceeded occurs when the budget limit was reached
@@ -193,7 +195,7 @@ func (sm *StateMachine) initTransitions() {
 	// Main flow
 	addTransition(StateWaitingForUserInput, StateSendingToLLM, StateCompacting, StateError)
 	addTransition(StateSendingToLLM, StateProcessingLLMResponse, StateError)
-	addTransition(StateProcessingLLMResponse, StateEndOfTurn, StateToolUseRequested, StateError)
+	addTransition(StateProcessingLLMResponse, StateEndOfTurn, StateToolUseRequested, StateSendingContinueMessage, StateError)
 	addTransition(StateEndOfTurn, StateWaitingForUserInput)
 
 	// Tool use flow
@@ -205,6 +207,7 @@ func (sm *StateMachine) initTransitions() {
 	addTransition(StateCheckingBudget, StateGatheringAdditionalMessages, StateBudgetExceeded)
 	addTransition(StateGatheringAdditionalMessages, StateSendingToolResults, StateError)
 	addTransition(StateSendingToolResults, StateProcessingLLMResponse, StateError)
+	addTransition(StateSendingContinueMessage, StateProcessingLLMResponse, StateError)
 
 	// Compaction flow
 	addTransition(StateCompacting, StateWaitingForUserInput, StateError)
