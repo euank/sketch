@@ -557,6 +557,7 @@ func createDockerContainer(ctx context.Context, cntrName, hostPort, relPath, img
 	// Add subtrace environment variable if token is provided
 	if config.SubtraceToken != "" {
 		cmdArgs = append(cmdArgs, "-e", "SUBTRACE_TOKEN="+config.SubtraceToken)
+		cmdArgs = append(cmdArgs, "-e", "SUBTRACE_HTTP2=1")
 	}
 
 	// Add volume mounts if specified
