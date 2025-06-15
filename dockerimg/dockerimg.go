@@ -124,6 +124,9 @@ type ContainerConfig struct {
 
 	// LinkToGitHub enables GitHub branch linking in UI
 	LinkToGitHub bool
+
+	// SubtraceToken enables running sketch under subtrace.dev (development only)
+	SubtraceToken string
 }
 
 // LaunchContainer creates a docker container for a project, installs sketch and opens a connection to it.
@@ -253,6 +256,14 @@ func LaunchContainer(ctx context.Context, config ContainerConfig) error {
 	}
 
 	fmt.Printf("📦 running in container %s\n", cntrName)
+
+	// Setup subtrace if token is provided (development only) - after container creation, before start
+	if config.SubtraceToken != "" {
+		fmt.Println("🔍 Setting up subtrace (development only)")
+		if err := setupSubtraceBeforeStart(ctx, cntrName, config.SubtraceToken); err != nil {
+			return fmt.Errorf("failed to setup subtrace: %w", err)
+		}
+	}
 
 	// Start the sketch container
 	if out, err := combinedOutput(ctx, "docker", "start", cntrName); err != nil {
@@ -543,16 +554,28 @@ func createDockerContainer(ctx context.Context, cntrName, hostPort, relPath, img
 	}
 	cmdArgs = append(cmdArgs, "--security-opt", "seccomp="+seccompPath)
 
+	// Add subtrace environment variable if token is provided
+	if config.SubtraceToken != "" {
+		cmdArgs = append(cmdArgs, "-e", "SUBTRACE_TOKEN="+config.SubtraceToken)
+	}
+
 	// Add volume mounts if specified
 	for _, mount := range config.Mounts {
 		if mount != "" {
 			cmdArgs = append(cmdArgs, "-v", mount)
 		}
 	}
-	cmdArgs = append(
-		cmdArgs,
-		imgName,
-		"/bin/sketch",
+	cmdArgs = append(cmdArgs, imgName)
+
+	// Add command: either [sketch] or [subtrace run -- sketch]
+	if config.SubtraceToken != "" {
+		cmdArgs = append(cmdArgs, "/usr/local/bin/subtrace", "run", "--", "/bin/sketch")
+	} else {
+		cmdArgs = append(cmdArgs, "/bin/sketch")
+	}
+
+	// Add all sketch arguments
+	cmdArgs = append(cmdArgs,
 		"-unsafe",
 		"-addr=:80",
 		"-session-id="+config.SessionID,
@@ -597,7 +620,7 @@ func createDockerContainer(ctx context.Context, cntrName, hostPort, relPath, img
 		// TODO: have outtie run an http proxy?
 		// TODO: select and forward the relevant API key based on the model
 		cmdArgs = append(cmdArgs, "-llm-api-key="+os.Getenv("ANTHROPIC_API_KEY"))
-	}
+	} 
 
 	// Add additional docker arguments if provided
 	if config.DockerArgs != "" {

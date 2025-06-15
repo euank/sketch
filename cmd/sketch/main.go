@@ -217,6 +217,7 @@ type CLIFlags struct {
 	outsideHTTP         string
 	branchPrefix        string
 	sshConnectionString string
+	subtraceToken       string
 }
 
 // parseCLIFlags parses all command-line flags and returns a CLIFlags struct
@@ -276,6 +277,7 @@ func parseCLIFlags() CLIFlags {
 
 	// Internal flags for development/debugging
 	internalFlags.StringVar(&flags.dumpDist, "dump-dist", "", "(internal) dump embedded /dist/ filesystem to specified directory and exit")
+	internalFlags.StringVar(&flags.subtraceToken, "subtrace-token", "", "(development) run sketch under subtrace.dev with the provided token")
 
 	// Custom usage function that shows only user-visible flags by default
 	userFlags.Usage = func() {
@@ -415,6 +417,7 @@ func runInHostMode(ctx context.Context, flags CLIFlags) error {
 		MaxDollars:     flags.maxDollars,
 		BranchPrefix:   flags.branchPrefix,
 		LinkToGitHub:   flags.linkToGitHub,
+		SubtraceToken:  flags.subtraceToken,
 	}
 
 	if err := dockerimg.LaunchContainer(ctx, config); err != nil {
