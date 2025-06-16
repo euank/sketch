@@ -3,8 +3,57 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { customElement, property, state } from "lit/decorators.js";
 import { AgentMessage, State } from "../types";
 import { marked, MarkedOptions, Renderer, Tokens } from "marked";
-import mermaid from "mermaid";
+import type mermaid from "mermaid";
 import DOMPurify from "dompurify";
+
+// Mermaid is loaded dynamically - see loadMermaid() function
+declare global {
+  interface Window {
+    mermaid?: typeof mermaid;
+  }
+}
+
+// Mermaid hash will be injected at build time
+declare const __MERMAID_HASH__: string;
+
+// Load Mermaid dynamically
+let mermaidLoadPromise: Promise<any> | null = null;
+
+function loadMermaid(): Promise<typeof mermaid> {
+  if (mermaidLoadPromise) {
+    return mermaidLoadPromise;
+  }
+
+  if (window.mermaid) {
+    return Promise.resolve(window.mermaid);
+  }
+
+  mermaidLoadPromise = new Promise((resolve, reject) => {
+    // Get the Mermaid hash from build-time constant
+    const mermaidHash = __MERMAID_HASH__;
+
+    // Try to load the external Mermaid bundle
+    const script = document.createElement("script");
+    script.onload = () => {
+      // The Mermaid bundle should set window.mermaid
+      if (window.mermaid) {
+        resolve(window.mermaid);
+      } else {
+        reject(new Error("Mermaid not loaded from external bundle"));
+      }
+    };
+    script.onerror = (error) => {
+      console.warn("Failed to load external Mermaid bundle:", error);
+      reject(new Error("Mermaid external bundle failed to load"));
+    };
+
+    // Don't set type="module" since we're using IIFE format
+    script.src = `./static/mermaid-standalone-${mermaidHash}.js`;
+    document.head.appendChild(script);
+  });
+
+  return mermaidLoadPromise;
+}
 import "./sketch-tool-calls";
 @customElement("sketch-timeline-message")
 export class SketchTimelineMessage extends LitElement {
@@ -702,14 +751,7 @@ export class SketchTimelineMessage extends LitElement {
 
   constructor() {
     super();
-    // Initialize mermaid with specific config
-    mermaid.initialize({
-      startOnLoad: false,
-      suppressErrorRendering: true,
-      theme: "default",
-      securityLevel: "loose", // Allows more flexibility but be careful with user-generated content
-      fontFamily: "monospace",
-    });
+    // Mermaid will be initialized lazily when first needed
   }
 
   // See https://lit.dev/docs/components/lifecycle/
@@ -727,38 +769,59 @@ export class SketchTimelineMessage extends LitElement {
   // Render mermaid diagrams after the component is updated
   renderMermaidDiagrams() {
     // Add a small delay to ensure the DOM is fully rendered
-    setTimeout(() => {
+    setTimeout(async () => {
       // Find all mermaid containers in our shadow root
       const containers = this.shadowRoot?.querySelectorAll(".mermaid");
       if (!containers || containers.length === 0) return;
 
-      // Process each mermaid diagram
-      containers.forEach((container) => {
-        const id = container.id;
-        const code = container.textContent || "";
-        if (!code || !id) return; // Use return for forEach instead of continue
+      try {
+        // Load mermaid dynamically
+        const mermaidLib = await loadMermaid();
+        
+        // Initialize mermaid with specific config (only once per load)
+        mermaidLib.initialize({
+          startOnLoad: false,
+          suppressErrorRendering: true,
+          theme: "default",
+          securityLevel: "loose", // Allows more flexibility but be careful with user-generated content
+          fontFamily: "monospace",
+        });
 
-        try {
-          // Clear any previous content
-          container.innerHTML = code;
+        // Process each mermaid diagram
+        containers.forEach((container) => {
+          const id = container.id;
+          const code = container.textContent || "";
+          if (!code || !id) return; // Use return for forEach instead of continue
 
-          // Render the mermaid diagram using promise
-          mermaid
-            .render(`${id}-svg`, code)
-            .then(({ svg }) => {
-              container.innerHTML = svg;
-            })
-            .catch((err) => {
-              console.error("Error rendering mermaid diagram:", err);
-              // Show the original code as fallback
-              container.innerHTML = `<pre>${code}</pre>`;
-            });
-        } catch (err) {
-          console.error("Error processing mermaid diagram:", err);
-          // Show the original code as fallback
+          try {
+            // Clear any previous content
+            container.innerHTML = code;
+
+            // Render the mermaid diagram using promise
+            mermaidLib
+              .render(`${id}-svg`, code)
+              .then(({ svg }) => {
+                container.innerHTML = svg;
+              })
+              .catch((err) => {
+                console.error("Error rendering mermaid diagram:", err);
+                // Show the original code as fallback
+                container.innerHTML = `<pre>${code}</pre>`;
+              });
+          } catch (err) {
+            console.error("Error processing mermaid diagram:", err);
+            // Show the original code as fallback
+            container.innerHTML = `<pre>${code}</pre>`;
+          }
+        });
+      } catch (err) {
+        console.error("Error loading mermaid:", err);
+        // Show the original code as fallback for all diagrams
+        containers.forEach((container) => {
+          const code = container.textContent || "";
           container.innerHTML = `<pre>${code}</pre>`;
-        }
-      });
+        });
+      }
     }, 100); // Small delay to ensure DOM is ready
   }
 

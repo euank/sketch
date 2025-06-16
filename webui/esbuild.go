@@ -215,22 +215,26 @@ func Build() (fs.FS, error) {
 		"node_modules/monaco-editor/esm/vs/language/json/json.worker.js",
 	}
 
-	// Additionally create a standalone Monaco bundle for caching
+	// Additionally create standalone bundles for caching
 	monacoHash, err := createStandaloneMonacoBundle(tmpHashDir, buildDir)
 	if err != nil {
 		return nil, fmt.Errorf("create monaco bundle: %w", err)
 	}
-	_ = monacoHash // We created it for caching benefits, but don't use it yet
 
-	// Bundle all files with Monaco as external (since they may transitively import Monaco)
+	mermaidHash, err := createStandaloneMermaidBundle(tmpHashDir, buildDir)
+	if err != nil {
+		return nil, fmt.Errorf("create mermaid bundle: %w", err)
+	}
+
+	// Bundle all files with Monaco and Mermaid as external (since they may transitively import them)
 	for _, tsName := range bundleTs {
-		// Use external Monaco for all TypeScript files to ensure consistency
+		// Use external Monaco and Mermaid for all TypeScript files to ensure consistency
 		if strings.HasSuffix(tsName, ".ts") {
-			if err := esbuildBundleWithExternal(tmpHashDir, filepath.Join(buildDir, tsName), monacoHash); err != nil {
+			if err := esbuildBundleWithExternals(tmpHashDir, filepath.Join(buildDir, tsName), monacoHash, mermaidHash); err != nil {
 				return nil, fmt.Errorf("esbuild: %s: %w", tsName, err)
 			}
 		} else {
-			// Bundle worker files normally (they don't use Monaco)
+			// Bundle worker files normally (they don't use Monaco or Mermaid)
 			if err := esbuildBundle(tmpHashDir, filepath.Join(buildDir, tsName), ""); err != nil {
 				return nil, fmt.Errorf("esbuild: %s: %w", tsName, err)
 			}
@@ -517,8 +521,60 @@ export default monaco;
 	return monacoHash, nil
 }
 
-// esbuildBundleWithExternal bundles a file with Monaco as external dependency
-func esbuildBundleWithExternal(outDir, src, monacoHash string) error {
+// createStandaloneMermaidBundle creates a separate Mermaid bundle with content-based hash
+// This is useful for caching Mermaid separately from the main application bundles
+func createStandaloneMermaidBundle(outDir, buildDir string) (string, error) {
+	// Create a temporary entry file that imports Mermaid and exposes it globally
+	mermaidEntryContent := `import mermaid from 'mermaid';
+window.mermaid = mermaid;
+export default mermaid;
+`
+	mermaidEntryPath := filepath.Join(buildDir, "mermaid-standalone-entry.js")
+	if err := os.WriteFile(mermaidEntryPath, []byte(mermaidEntryContent), 0o666); err != nil {
+		return "", fmt.Errorf("write mermaid entry: %w", err)
+	}
+
+	// Calculate hash of mermaid package for content-based naming
+	mermaidPackageJson := filepath.Join(buildDir, "node_modules", "mermaid", "package.json")
+	mermaidContent, err := os.ReadFile(mermaidPackageJson)
+	if err != nil {
+		return "", fmt.Errorf("read mermaid package.json: %w", err)
+	}
+
+	h := sha256.New()
+	h.Write(mermaidContent)
+	mermaidHash := hex.EncodeToString(h.Sum(nil))[:16]
+
+	// Bundle Mermaid with content-based filename
+	mermaidOutputName := fmt.Sprintf("mermaid-standalone-%s.js", mermaidHash)
+	mermaidOutputPath := filepath.Join(outDir, mermaidOutputName)
+
+	args := []string{
+		mermaidEntryPath,
+		"--bundle",
+		"--sourcemap",
+		"--minify",
+		"--log-level=error",
+		"--outfile=" + mermaidOutputPath,
+		"--format=iife",
+		"--global-name=__MermaidLoader__",
+		"--loader:.ttf=file",
+		"--loader:.eot=file",
+		"--loader:.woff=file",
+		"--loader:.woff2=file",
+		"--public-path=.",
+	}
+
+	ret := esbuildcli.Run(args)
+	if ret != 0 {
+		return "", fmt.Errorf("esbuild mermaid bundle failed: %d", ret)
+	}
+
+	return mermaidHash, nil
+}
+
+// esbuildBundleWithExternals bundles a file with Monaco and Mermaid as external dependencies
+func esbuildBundleWithExternals(outDir, src, monacoHash, mermaidHash string) error {
 	args := []string{
 		src,
 		"--bundle",
@@ -527,12 +583,14 @@ func esbuildBundleWithExternal(outDir, src, monacoHash string) error {
 		"--log-level=error",
 		"--outdir=" + outDir,
 		"--external:monaco-editor",
+		"--external:mermaid",
 		"--loader:.ttf=file",
 		"--loader:.eot=file",
 		"--loader:.woff=file",
 		"--loader:.woff2=file",
 		"--public-path=.",
 		"--define:__MONACO_HASH__=\"" + monacoHash + "\"",
+		"--define:__MERMAID_HASH__=\"" + mermaidHash + "\"",
 	}
 
 	ret := esbuildcli.Run(args)
