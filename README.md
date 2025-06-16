@@ -23,6 +23,18 @@ Sketch helps with most programming environments, but Sketch has extra goodies fo
 
 <img src="https://storage.googleapis.com/sketch-assets/screenshot.jpg" alt="Sketch Screenshot" width="800"/>
 
+## 🎨 A Sketch of Code
+
+*In containers we dwell, safe from the host,*  
+*Where Docker keeps chaos from what matters most.*  
+*With branches that bloom from git's fertile ground,*  
+*New features take shape where old bugs are found.*  
+
+*The owl draws wisdom in terminal light,*  
+*While web UI whispers through browser's sight.*  
+*Ask and receive, let the agent explore,*  
+*Your codebase transformed, then pushed to your shore.*
+
 ## 📋 Quick Start
 
 ```sh
