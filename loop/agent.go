@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"slices"
 	"strconv"
@@ -230,6 +231,8 @@ type GitCommit struct {
 	Subject      string `json:"subject"`                 // Commit subject line
 	Body         string `json:"body"`                    // Full commit message body
 	PushedBranch string `json:"pushed_branch,omitempty"` // If set, this commit was pushed to this branch
+	LinesAdded   int    `json:"lines_added,omitempty"`   // Number of lines added in this commit
+	LinesDeleted int    `json:"lines_deleted,omitempty"` // Number of lines deleted in this commit
 }
 
 // ToolCall represents a single tool call within an agent message
@@ -1909,10 +1912,10 @@ func (ags *AgentGitState) handleGitCommits(ctx context.Context, sessionID string
 	var commits []*GitCommit
 
 	// Get commits since the initial commit
-	// Format: <hash>\0<subject>\0<body>\0
+	// Format: <hash>\0<subject>\0<body>\0\0<shortstat>
 	// This uses NULL bytes as separators to avoid issues with newlines in commit messages
 	// Limit to 100 commits to avoid overwhelming the user
-	cmd := exec.CommandContext(ctx, "git", "log", "-n", "100", "--pretty=format:%H%x00%s%x00%b%x00", "^"+baseRef, sketch)
+	cmd := exec.CommandContext(ctx, "git", "log", "-n", "100", "--pretty=format:%H%x00%s%x00%b%x00%x00", "--shortstat", "^"+baseRef, sketch)
 	cmd.Dir = repoRoot
 	output, err := cmd.Output()
 	if err != nil {
@@ -2028,7 +2031,7 @@ func cleanSlugName(s string) string {
 	}, s)
 }
 
-// parseGitLog parses the output of git log with format '%H%x00%s%x00%b%x00'
+// parseGitLog parses the output of git log with format '%H%x00%s%x00%b%x00%x00' --shortstat
 // and returns an array of GitCommit structs.
 func parseGitLog(output string) []GitCommit {
 	var commits []GitCommit
@@ -2038,44 +2041,88 @@ func parseGitLog(output string) []GitCommit {
 		return commits
 	}
 
-	// Split by NULL byte
-	parts := strings.Split(output, "\x00")
+	// Use a simpler approach: scan through the output looking for commit patterns
+	// Each commit starts with a hash followed by null bytes, ends with shortstat line(s)
+	lines := strings.Split(output, "\n")
+	var currentCommit *GitCommit
+	var commitLines []string
 
-	// Process in triplets (hash, subject, body)
-	for i := 0; i < len(parts); i++ {
-		// Skip empty parts
-		if parts[i] == "" {
-			continue
+	for _, line := range lines {
+		// Check if this line contains null bytes (start of commit info)
+		if strings.Contains(line, "\x00") {
+			// Process the previous commit if we have one
+			if currentCommit != nil {
+				// Look for shortstat in the accumulated lines
+				for _, commitLine := range commitLines {
+					if commitLine != "" && (strings.Contains(commitLine, "changed") || strings.Contains(commitLine, "insertion") || strings.Contains(commitLine, "deletion")) {
+						a, d := parseShortstat(commitLine)
+						currentCommit.LinesAdded = a
+						currentCommit.LinesDeleted = d
+						break
+					}
+				}
+				commits = append(commits, *currentCommit)
+			}
+
+			// Start new commit
+			parts := strings.Split(line, "\x00")
+			if len(parts) >= 2 {
+				hash := strings.TrimSpace(parts[0])
+				subject := strings.TrimSpace(parts[1])
+				body := ""
+				if len(parts) > 2 {
+					body = strings.TrimSpace(parts[2])
+				}
+
+				currentCommit = &GitCommit{
+					Hash:    hash,
+					Subject: subject,
+					Body:    body,
+				}
+				commitLines = []string{}
+			}
+		} else if currentCommit != nil {
+			// Accumulate lines for the current commit
+			commitLines = append(commitLines, strings.TrimSpace(line))
 		}
+	}
 
-		// This should be a hash
-		hash := strings.TrimSpace(parts[i])
-
-		// Make sure we have at least a subject part available
-		if i+1 >= len(parts) {
-			break // No more parts available
+	// Process the last commit
+	if currentCommit != nil {
+		for _, commitLine := range commitLines {
+			if commitLine != "" && (strings.Contains(commitLine, "changed") || strings.Contains(commitLine, "insertion") || strings.Contains(commitLine, "deletion")) {
+				a, d := parseShortstat(commitLine)
+				currentCommit.LinesAdded = a
+				currentCommit.LinesDeleted = d
+				break
+			}
 		}
-
-		// Get the subject
-		subject := strings.TrimSpace(parts[i+1])
-
-		// Get the body if available
-		body := ""
-		if i+2 < len(parts) {
-			body = strings.TrimSpace(parts[i+2])
-		}
-
-		// Skip to the next triplet
-		i += 2
-
-		commits = append(commits, GitCommit{
-			Hash:    hash,
-			Subject: subject,
-			Body:    body,
-		})
+		commits = append(commits, *currentCommit)
 	}
 
 	return commits
+}
+
+// parseShortstat parses a git shortstat line like " 2 files changed, 29 insertions(+), 29 deletions(-)"
+// and returns the number of insertions and deletions
+func parseShortstat(line string) (insertions int, deletions int) {
+	// Use regex to extract insertions and deletions
+	insertionRegex := regexp.MustCompile(`(\d+) insertion`)
+	deletionRegex := regexp.MustCompile(`(\d+) deletion`)
+
+	if matches := insertionRegex.FindStringSubmatch(line); len(matches) > 1 {
+		if val, err := strconv.Atoi(matches[1]); err == nil {
+			insertions = val
+		}
+	}
+
+	if matches := deletionRegex.FindStringSubmatch(line); len(matches) > 1 {
+		if val, err := strconv.Atoi(matches[1]); err == nil {
+			deletions = val
+		}
+	}
+
+	return insertions, deletions
 }
 
 func repoRoot(ctx context.Context, dir string) (string, error) {
