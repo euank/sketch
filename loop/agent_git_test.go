@@ -216,41 +216,39 @@ func TestParseGitLog(t *testing.T) {
 		},
 		{
 			name:  "Single commit",
-			input: "abcdef1234567890\x00Initial commit\x00This is the first commit\x00",
+			input: "abcdef1234567890\x00Initial commit\x00This is the first commit\x00\x00\n 1 file changed, 5 insertions(+)",
 			expected: []GitCommit{
-				{Hash: "abcdef1234567890", Subject: "Initial commit", Body: "This is the first commit"},
+				{Hash: "abcdef1234567890", Subject: "Initial commit", Body: "This is the first commit", LinesAdded: 5, LinesDeleted: 0},
 			},
 		},
 		{
-			name: "Multiple commits",
-			input: "abcdef1234567890\x00Initial commit\x00This is the first commit\x00" +
-				"fedcba0987654321\x00Second commit\x00This is the second commit\x00" +
-				"123456abcdef7890\x00Third commit\x00This is the third commit\x00",
+			name:  "Multiple commits",
+			input: "abcdef1234567890\x00Initial commit\x00This is the first commit\x00\x00\n 1 file changed, 5 insertions(+)\n\nfedcba0987654321\x00Second commit\x00This is the second commit\x00\x00\n 2 files changed, 10 insertions(+), 3 deletions(-)\n\n123456abcdef7890\x00Third commit\x00This is the third commit\x00\x00\n 1 file changed, 2 insertions(+), 1 deletion(-)",
 			expected: []GitCommit{
-				{Hash: "abcdef1234567890", Subject: "Initial commit", Body: "This is the first commit"},
-				{Hash: "fedcba0987654321", Subject: "Second commit", Body: "This is the second commit"},
-				{Hash: "123456abcdef7890", Subject: "Third commit", Body: "This is the third commit"},
+				{Hash: "abcdef1234567890", Subject: "Initial commit", Body: "This is the first commit", LinesAdded: 5, LinesDeleted: 0},
+				{Hash: "fedcba0987654321", Subject: "Second commit", Body: "This is the second commit", LinesAdded: 10, LinesDeleted: 3},
+				{Hash: "123456abcdef7890", Subject: "Third commit", Body: "This is the third commit", LinesAdded: 2, LinesDeleted: 1},
 			},
 		},
 		{
 			name:  "Commit with multi-line body",
-			input: "abcdef1234567890\x00Commit with multi-line body\x00This is a commit\nwith a multi-line\nbody message\x00",
+			input: "abcdef1234567890\x00Commit with multi-line body\x00This is a commit\nwith a multi-line\nbody message\x00\x00\n 3 files changed, 15 insertions(+), 8 deletions(-)",
 			expected: []GitCommit{
-				{Hash: "abcdef1234567890", Subject: "Commit with multi-line body", Body: "This is a commit\nwith a multi-line\nbody message"},
+				{Hash: "abcdef1234567890", Subject: "Commit with multi-line body", Body: "This is a commit\nwith a multi-line\nbody message", LinesAdded: 15, LinesDeleted: 8},
 			},
 		},
 		{
 			name:  "Commit with empty body",
-			input: "abcdef1234567890\x00Commit with empty body\x00\x00",
+			input: "abcdef1234567890\x00Commit with empty body\x00\x00\x00\n 1 file changed, 1 insertion(+)",
 			expected: []GitCommit{
-				{Hash: "abcdef1234567890", Subject: "Commit with empty body", Body: ""},
+				{Hash: "abcdef1234567890", Subject: "Commit with empty body", Body: "", LinesAdded: 1, LinesDeleted: 0},
 			},
 		},
 		{
 			name:  "Empty parts removed",
-			input: "\x00abcdef1234567890\x00Initial commit\x00This is the first commit\x00\x00",
+			input: "abcdef1234567890\x00Initial commit\x00This is the first commit\x00\x00\n 1 file changed, 1 insertion(+)",
 			expected: []GitCommit{
-				{Hash: "abcdef1234567890", Subject: "Initial commit", Body: "This is the first commit"},
+				{Hash: "abcdef1234567890", Subject: "Initial commit", Body: "This is the first commit", LinesAdded: 1, LinesDeleted: 0},
 			},
 		},
 	}
@@ -265,7 +263,7 @@ func TestParseGitLog(t *testing.T) {
 
 			for i, commit := range actual {
 				expected := tt.expected[i]
-				if commit.Hash != expected.Hash || commit.Subject != expected.Subject || commit.Body != expected.Body {
+				if commit.Hash != expected.Hash || commit.Subject != expected.Subject || commit.Body != expected.Body || commit.LinesAdded != expected.LinesAdded || commit.LinesDeleted != expected.LinesDeleted {
 					t.Errorf("Commit %d doesn't match:\nExpected: %+v\nGot:      %+v", i, expected, commit)
 				}
 			}
