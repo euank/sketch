@@ -31,25 +31,7 @@ export class MobileDiff extends LitElement {
       background-color: #ffffff;
     }
 
-    .diff-header {
-      padding: 12px 16px;
-      background-color: #f8f9fa;
-      border-bottom: 1px solid #e9ecef;
-      flex-shrink: 0;
-    }
 
-    .diff-header h2 {
-      margin: 0;
-      font-size: 16px;
-      font-weight: 600;
-      color: #212529;
-    }
-
-    .diff-header p {
-      margin: 4px 0 0 0;
-      font-size: 14px;
-      color: #6c757d;
-    }
 
     .diff-container {
       flex: 1;
@@ -323,11 +305,6 @@ export class MobileDiff extends LitElement {
 
   render() {
     return html`
-      <div class="diff-header">
-        <h2>Changes</h2>
-        <p>Showing changes from ${this.baseCommit || 'base commit'} to working directory</p>
-      </div>
-      
       <div class="diff-container">
         ${this.loading
           ? html`<div class="loading">Loading diff...</div>`

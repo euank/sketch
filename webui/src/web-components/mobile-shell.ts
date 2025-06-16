@@ -170,15 +170,15 @@ export class MobileShell extends LitElement {
                 .messages=${this.messages}
                 .isThinking=${isThinking}
               ></mobile-chat>
-
-              <mobile-chat-input
-                .disabled=${this.connectionStatus !== "connected"}
-                @send-message=${this.handleSendMessage}
-              ></mobile-chat-input>
             `
           : html`
               <mobile-diff></mobile-diff>
             `}
+
+        <mobile-chat-input
+          .disabled=${this.connectionStatus !== "connected"}
+          @send-message=${this.handleSendMessage}
+        ></mobile-chat-input>
       </div>
     `;
   }

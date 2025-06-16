@@ -30,33 +30,34 @@ export class MobileTitle extends LitElement {
       justify-content: space-between;
     }
 
-    .nav-container {
+    .right-section {
       display: flex;
       align-items: center;
-      gap: 16px;
-      margin-top: 8px;
+      gap: 12px;
     }
 
-    .nav-button {
+    .view-selector {
       background: none;
-      border: none;
-      padding: 8px 12px;
+      border: 1px solid #e9ecef;
       border-radius: 6px;
+      padding: 6px 8px;
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s ease;
-      color: #6c757d;
-    }
-
-    .nav-button.active {
-      background-color: #007acc;
-      color: white;
-    }
-
-    .nav-button:not(.active):hover {
-      background-color: #e9ecef;
       color: #495057;
+      min-width: 60px;
+    }
+
+    .view-selector:hover {
+      background-color: #f8f9fa;
+      border-color: #dee2e6;
+    }
+
+    .view-selector:focus {
+      outline: none;
+      border-color: #007acc;
+      box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
     }
 
     .title {
@@ -179,14 +180,16 @@ export class MobileTitle extends LitElement {
     }
   }
 
-  private handleNavClick(view: "chat" | "diff") {
+  private handleViewChange(event: Event) {
+    const select = event.target as HTMLSelectElement;
+    const view = select.value as "chat" | "diff";
     if (view !== this.currentView) {
-      const event = new CustomEvent("view-change", {
+      const changeEvent = new CustomEvent("view-change", {
         detail: { view },
         bubbles: true,
         composed: true,
       });
-      this.dispatchEvent(event);
+      this.dispatchEvent(changeEvent);
     }
   }
 
@@ -206,7 +209,16 @@ export class MobileTitle extends LitElement {
             : html`Sketch`}
         </h1>
 
-        <div class="status-indicator">
+        <div class="right-section">
+          <select
+            class="view-selector"
+            .value=${this.currentView}
+            @change=${this.handleViewChange}
+          >
+            <option value="chat">Chat</option>
+            <option value="diff">Diff</option>
+          </select>
+
           ${this.isThinking
             ? html`
                 <div class="thinking-indicator">
@@ -220,24 +232,8 @@ export class MobileTitle extends LitElement {
               `
             : html`
                 <span class="status-dot ${this.connectionStatus}"></span>
-                <span>${this.getStatusText()}</span>
               `}
         </div>
-      </div>
-
-      <div class="nav-container">
-        <button
-          class="nav-button ${this.currentView === "chat" ? "active" : ""}"
-          @click=${() => this.handleNavClick("chat")}
-        >
-          Chat
-        </button>
-        <button
-          class="nav-button ${this.currentView === "diff" ? "active" : ""}"
-          @click=${() => this.handleNavClick("diff")}
-        >
-          Diff
-        </button>
       </div>
     `;
   }
