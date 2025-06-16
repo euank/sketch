@@ -245,8 +245,6 @@ export class MobileChat extends LitElement {
     /* Tool calls styling for mobile */
     .tool-calls {
       margin-top: 12px;
-      padding-top: 8px;
-      border-top: 1px solid rgba(0, 0, 0, 0.1);
       display: flex;
       flex-direction: column;
       gap: 6px;
@@ -265,29 +263,7 @@ export class MobileChat extends LitElement {
       gap: 6px;
     }
 
-    .tool-call-item.bash {
-      border-left-color: #28a745;
-    }
 
-    .tool-call-item.patch {
-      border-left-color: #fd7e14;
-    }
-
-    .tool-call-item.think {
-      border-left-color: #6f42c1;
-    }
-
-    .tool-call-item.keyword_search {
-      border-left-color: #17a2b8;
-    }
-
-    .tool-call-item.browser_navigate {
-      border-left-color: #007bff;
-    }
-
-    .tool-call-item.browser_take_screenshot {
-      border-left-color: #e83e8c;
-    }
 
     .tool-status-icon {
       flex-shrink: 0;
@@ -510,7 +486,13 @@ export class MobileChat extends LitElement {
           return `Slug: "${input.slug || ""}"`;
         
         case "multiplechoice":
-          return input.question || "Multiple choice question";
+          const question = input.question || "Multiple choice question";
+          const options = input.responseOptions || [];
+          if (options.length > 0) {
+            const optionsList = options.map(opt => opt.caption).join(", ");
+            return `${question} [${optionsList}]`;
+          }
+          return question;
         
         case "done":
           return "Task completion checklist";
