@@ -226,7 +226,6 @@ func (tm *TunnelManager) createTunnel(ctx context.Context, containerPort string)
 func (tm *TunnelManager) removeTunnel(ctx context.Context, containerPort string) {
 	tunnel, exists := tm.activeTunnels[containerPort]
 	if !exists {
-		slog.DebugContext(ctx, "No tunnel to remove for port", "port", containerPort)
 		return
 	}
 
