@@ -419,6 +419,25 @@ func GitSaveFile(repoDir, filePath, content string) error {
 	return nil
 }
 
+// GitDeleteFile removes a file from both the working directory and git index (git rm)
+// This function validates that the file is tracked by git before attempting deletion
+func GitDeleteFile(ctx context.Context, repoDir, filePath string) error {
+	// Validate that the file is tracked by git and within repo boundaries
+	_, err := validateRepoPath(repoDir, filePath)
+	if err != nil {
+		return err
+	}
+
+	// Use git rm to remove the file from both working directory and index
+	cmd := exec.CommandContext(ctx, "git", "rm", filePath)
+	cmd.Dir = repoDir
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("error removing file %s from git: %w", filePath, err)
+	}
+
+	return nil
+}
+
 // AutoCommitDiffViewChanges automatically commits changes to the specified file
 // If the last commit message is exactly "User changes from diff view.", it amends the commit
 // Otherwise, it creates a new commit
@@ -452,6 +471,40 @@ func AutoCommitDiffViewChanges(ctx context.Context, repoDir, filePath string) er
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("error committing changes: %w", err)
+	}
+
+	return nil
+}
+
+// AutoCommitDiffViewDeletion automatically commits deletion of the specified file
+// If the last commit message is exactly "User changes from diff view.", it amends the commit
+// Otherwise, it creates a new commit
+func AutoCommitDiffViewDeletion(ctx context.Context, repoDir, filePath string) error {
+	// Check if the last commit has the expected message
+	cmd := exec.CommandContext(ctx, "git", "log", "-1", "--pretty=%s")
+	cmd.Dir = repoDir
+	output, err := cmd.Output()
+	commitMsg := strings.TrimSpace(string(output))
+
+	// Check if we should amend or create a new commit
+	const expectedMsg = "User changes from diff view."
+	amend := err == nil && commitMsg == expectedMsg
+
+	// Note: The file is already removed from git index by GitDeleteFile,
+	// so we don't need to run 'git add' or 'git rm' again
+
+	// Commit the deletion
+	if amend {
+		// Amend the previous commit
+		cmd = exec.CommandContext(ctx, "git", "commit", "--amend", "--no-edit")
+	} else {
+		// Create a new commit
+		cmd = exec.CommandContext(ctx, "git", "commit", "-m", expectedMsg)
+	}
+	cmd.Dir = repoDir
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("error committing deletion: %w", err)
 	}
 
 	return nil

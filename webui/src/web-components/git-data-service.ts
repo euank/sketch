@@ -54,6 +54,12 @@ export interface GitDataService {
   saveFileContent(filePath: string, content: string): Promise<void>;
 
   /**
+   * Deletes a file from the working directory and repository (git rm)
+   * @param filePath Path to the file within the repository
+   */
+  deleteFile(filePath: string): Promise<void>;
+
+  /**
    * Gets the base commit reference (often "sketch-base")
    * @returns Base commit reference
    */
@@ -199,6 +205,33 @@ export class DefaultGitDataService implements GitDataService {
       // Don't need to return the response, just ensure it was successful
     } catch (error) {
       console.error("Error saving file content:", error);
+      throw error;
+    }
+  }
+
+  async deleteFile(filePath: string): Promise<void> {
+    try {
+      const url = `git/delete`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          path: filePath,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to delete file: ${response.statusText} - ${errorText}`,
+        );
+      }
+
+      // Don't need to return the response, just ensure it was successful
+    } catch (error) {
+      console.error("Error deleting file:", error);
       throw error;
     }
   }

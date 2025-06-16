@@ -215,6 +215,19 @@ export class CodeDiffEditor extends LitElement {
     }
   }
 
+  // Method to be called from parent when delete is complete
+  public notifyDeleteComplete(success: boolean) {
+    if (success) {
+      // File was deleted successfully - the parent component should handle 
+      // removing this editor from the view or updating the diff
+      console.log(`File ${this.modifiedFilename} was deleted successfully`);
+    } else {
+      // Show error - could enhance this with better error handling
+      console.error(`Failed to delete file ${this.modifiedFilename}`);
+      alert(`Failed to delete file ${this.modifiedFilename}. Please try again.`);
+    }
+  }
+
   // Rescue people with strong save-constantly habits
   private setupKeyboardShortcuts() {
     if (!this.editor) return;
@@ -230,6 +243,49 @@ export class CodeDiffEditor extends LitElement {
         this.requestSave();
       },
     );
+
+    // Add context menu actions
+    this.addContextMenuActions(modifiedEditor);
+  }
+
+  // Add context menu actions for file operations
+  private addContextMenuActions(editor: monaco.editor.IStandaloneCodeEditor) {
+    if (!this.editableRight) return; // Only add actions when editing is enabled
+    
+    const monaco = window.monaco;
+    if (!monaco) return;
+
+    // Add "Delete File" action to context menu
+    editor.addAction({
+      id: 'delete-file',
+      label: 'Delete File',
+      contextMenuGroupId: 'file_operations',
+      contextMenuOrder: 1.5,
+      run: () => {
+        this.requestDeleteFile();
+      }
+    });
+  }
+
+  // Request file deletion
+  private requestDeleteFile() {
+    if (!this.editableRight || !this.modifiedFilename) return;
+
+    // Show confirmation dialog
+    const confirmed = confirm(`Are you sure you want to delete "${this.modifiedFilename}"?\n\nThis will perform a git rm operation and cannot be undone.`);
+    
+    if (!confirmed) return;
+
+    // Create and dispatch the delete event
+    const deleteEvent = new CustomEvent("monaco-delete", {
+      detail: {
+        path: this.modifiedFilename,
+      },
+      bubbles: true,
+      composed: true,
+    });
+
+    this.dispatchEvent(deleteEvent);
   }
 
   // Setup content change listener for debounced save

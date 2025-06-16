@@ -157,6 +157,7 @@ func New(agent loop.CodingAgent, logFile *os.File) (*Server, error) {
 	s.mux.HandleFunc("/git/show", s.handleGitShow)
 	s.mux.HandleFunc("/git/cat", s.handleGitCat)
 	s.mux.HandleFunc("/git/save", s.handleGitSave)
+	s.mux.HandleFunc("/git/delete", s.handleGitDelete)
 	s.mux.HandleFunc("/git/recentlog", s.handleGitRecentLog)
 
 	s.mux.HandleFunc("/diff", func(w http.ResponseWriter, r *http.Request) {
@@ -1490,6 +1491,57 @@ func (s *Server) handleGitSave(w http.ResponseWriter, r *http.Request) {
 	err = git_tools.AutoCommitDiffViewChanges(r.Context(), repoDir, requestBody.Path)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error auto-committing changes: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Detect git changes to push and notify user
+	if err = s.agent.DetectGitChanges(r.Context()); err != nil {
+		http.Error(w, fmt.Sprintf("Error detecting git changes: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Return simple success response
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("ok"))
+}
+
+func (s *Server) handleGitDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get the git repository root directory from agent
+	repoDir := s.agent.RepoRoot()
+
+	// Parse request body
+	var requestBody struct {
+		Path string `json:"path"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		http.Error(w, fmt.Sprintf("Error parsing request body: %v", err), http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// Check if path is provided
+	if requestBody.Path == "" {
+		http.Error(w, "Missing required parameter: path", http.StatusBadRequest)
+		return
+	}
+
+	// Delete file using GitDeleteFile
+	err := git_tools.GitDeleteFile(r.Context(), repoDir, requestBody.Path)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error deleting file: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Auto-commit the deletion
+	err = git_tools.AutoCommitDiffViewDeletion(r.Context(), repoDir, requestBody.Path)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error auto-committing deletion: %v", err), http.StatusInternalServerError)
 		return
 	}
 

@@ -127,6 +127,44 @@ export class SketchDiff2View extends LitElement {
       console.error("Error handling save:", error);
     }
   }
+
+  /**
+   * Handle delete events from the Monaco editor
+   */
+  private async handleMonacoDelete(event: CustomEvent) {
+    try {
+      // Validate incoming data
+      if (!event.detail || !event.detail.path) {
+        console.error("Invalid delete data received");
+        return;
+      }
+
+      const { path } = event.detail;
+
+      // Get Monaco view component that triggered the event
+      const monacoView = event.target as any;
+      if (!monacoView) {
+        console.error("Monaco view not found");
+        return;
+      }
+
+      try {
+        await this.gitService?.deleteFile(path);
+        console.log(`File deleted: ${path}`);
+        monacoView.notifyDeleteComplete(true);
+        
+        // Refresh the diff view to show the updated state
+        this.loadDiffData();
+      } catch (error) {
+        console.error(
+          `Error deleting file: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        monacoView.notifyDeleteComplete(false);
+      }
+    } catch (error) {
+      console.error("Error handling delete:", error);
+    }
+  }
   @property({ type: String })
   initialCommit: string = "";
 
@@ -829,6 +867,7 @@ export class SketchDiff2View extends LitElement {
             ?editable-right="${content.editable}"
             @monaco-comment="${this.handleMonacoComment}"
             @monaco-save="${this.handleMonacoSave}"
+            @monaco-delete="${this.handleMonacoDelete}"
             @monaco-height-changed="${this.handleMonacoHeightChange}"
             data-file-index="${index}"
             data-file-path="${file.path}"
@@ -1065,6 +1104,7 @@ export class SketchDiff2View extends LitElement {
           ?editable-right="${content.editable}"
           @monaco-comment="${this.handleMonacoComment}"
           @monaco-save="${this.handleMonacoSave}"
+          @monaco-delete="${this.handleMonacoDelete}"
           data-file-path="${selectedFileData.path}"
         ></sketch-monaco-view>
       </div>

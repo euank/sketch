@@ -423,4 +423,15 @@ button {
     );
     // Return void as per interface
   }
+
+  async deleteFile(filePath: string): Promise<void> {
+    console.log(
+      `[MockGitDataService] Deleting file at path: ${filePath}`,
+    );
+    // Simulate a network delay
+    await this.delay(500);
+    // In a mock implementation, we just log the delete attempt
+    console.log(`File would be deleted: ${filePath}`);
+    // Return void as per interface
+  }
 }
