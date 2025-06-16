@@ -4,7 +4,6 @@ import { createRef, Ref, ref } from "lit/directives/ref.js";
 
 // See https://rodydavis.com/posts/lit-monaco-editor for some ideas.
 
-// Monaco types for proper TypeScript support
 import type * as monaco from "monaco-editor";
 
 // Monaco is loaded dynamically - see loadMonaco() function
@@ -222,11 +221,11 @@ export class CodeDiffEditor extends LitElement {
     const modifiedEditor = this.editor.getModifiedEditor();
     if (!modifiedEditor) return;
 
-    const monaco = window.monaco;
-    if (!monaco) return;
+    const monacoInstance = window.monaco;
+    if (!monacoInstance) return;
     
     modifiedEditor.addCommand(
-      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+      monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
       () => {
         this.requestSave();
       },
@@ -591,8 +590,8 @@ export class CodeDiffEditor extends LitElement {
       const model = this.editor.getOriginalEditor().getModel();
       if (model) {
         model.setValue(code);
-        if (filename) {
-          monaco.editor.setModelLanguage(
+        if (filename && window.monaco) {
+          window.monaco.editor.setModelLanguage(
             model,
             this.getLanguageForFile(filename),
           );
@@ -612,8 +611,8 @@ export class CodeDiffEditor extends LitElement {
       const model = this.editor.getModifiedEditor().getModel();
       if (model) {
         model.setValue(code);
-        if (filename) {
-          monaco.editor.setModelLanguage(
+        if (filename && window.monaco) {
+          window.monaco.editor.setModelLanguage(
             model,
             this.getLanguageForFile(filename),
           );
@@ -631,7 +630,7 @@ export class CodeDiffEditor extends LitElement {
     // Build the extension-to-language map on first use
     if (!this._extensionToLanguageMap) {
       this._extensionToLanguageMap = new Map();
-      const languages = monaco.languages.getLanguages();
+      const languages = window.monaco?.languages.getLanguages() || [];
 
       for (const language of languages) {
         if (language.extensions) {
@@ -686,14 +685,14 @@ export class CodeDiffEditor extends LitElement {
   private async initializeEditor() {
     try {
       // Load Monaco dynamically
-      const monaco = await loadMonaco();
+      const monacoInstance = await loadMonaco();
       
       // Disable semantic validation globally for TypeScript/JavaScript if available
-      if (monaco.languages && monaco.languages.typescript) {
-        monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+      if (monacoInstance.languages && monacoInstance.languages.typescript) {
+        monacoInstance.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
           noSemanticValidation: true,
         });
-        monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+        monacoInstance.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
           noSemanticValidation: true,
         });
       }
@@ -701,7 +700,7 @@ export class CodeDiffEditor extends LitElement {
       // First time initialization
       if (!this.editor) {
         // Create the diff editor with auto-sizing configuration
-        this.editor = monaco.editor.createDiffEditor(this.container.value!, {
+        this.editor = monacoInstance.editor.createDiffEditor(this.container.value!, {
           automaticLayout: false, // We'll resize manually
           readOnly: true,
           theme: "vs", // Always use light mode
@@ -747,18 +746,18 @@ export class CodeDiffEditor extends LitElement {
         this.setupAutoSizing();
 
         // Add Monaco editor to debug global
-        this.addToDebugGlobal();
+        this.addToDebugGlobal(monacoInstance);
       }
 
       // Create or update models
-      this.updateModels();
+      this.updateModels(monacoInstance);
       // Set up content change listener
       this.setupContentChangeListener();
 
       // Fix cursor positioning issues by ensuring fonts are loaded
       document.fonts.ready.then(() => {
         if (this.editor) {
-          monaco.editor.remeasureFonts();
+          monacoInstance.editor.remeasureFonts();
           this.fitEditorToContent();
         }
       });
@@ -1104,7 +1103,7 @@ export class CodeDiffEditor extends LitElement {
     }
   }
 
-  private updateModels() {
+  private updateModels(monacoInstance: typeof monaco) {
     try {
       // Get language based on filename
       const originalLang = this.getLanguageForFile(this.originalFilename || "");
@@ -1113,10 +1112,10 @@ export class CodeDiffEditor extends LitElement {
       // Always create new models with unique URIs based on timestamp to avoid conflicts
       const timestamp = new Date().getTime();
       // TODO: Could put filename in these URIs; unclear how they're used right now.
-      const originalUri = monaco.Uri.parse(
+      const originalUri = monacoInstance.Uri.parse(
         `file:///original-${timestamp}.${originalLang}`,
       );
-      const modifiedUri = monaco.Uri.parse(
+      const modifiedUri = monacoInstance.Uri.parse(
         `file:///modified-${timestamp}.${modifiedLang}`,
       );
 
@@ -1143,13 +1142,13 @@ export class CodeDiffEditor extends LitElement {
       }
 
       // Create new models
-      this.originalModel = monaco.editor.createModel(
+      this.originalModel = monacoInstance.editor.createModel(
         this.originalCode || "",
         originalLang,
         originalUri,
       );
 
-      this.modifiedModel = monaco.editor.createModel(
+      this.modifiedModel = monacoInstance.editor.createModel(
         this.modifiedCode || "",
         modifiedLang,
         modifiedUri,
@@ -1192,8 +1191,8 @@ export class CodeDiffEditor extends LitElement {
       changedProperties.has("modifiedFilename") ||
       changedProperties.has("editableRight")
     ) {
-      if (this.editor) {
-        this.updateModels();
+      if (this.editor && window.monaco) {
+        this.updateModels(window.monaco);
 
         // Force auto-sizing after model updates
         // Use a slightly longer delay to ensure layout is stable
@@ -1333,15 +1332,15 @@ export class CodeDiffEditor extends LitElement {
    * Add this Monaco editor instance to the global debug object
    * This allows inspection and debugging via browser console
    */
-  private addToDebugGlobal() {
+  private addToDebugGlobal(monacoInstance: typeof monaco) {
     try {
       // Initialize the debug global if it doesn't exist
       if (!(window as any).sketchDebug) {
         (window as any).sketchDebug = {
-          monaco: monaco,
+          monaco: monacoInstance,
           editors: [],
           remeasureFonts: () => {
-            monaco.editor.remeasureFonts();
+            monacoInstance.editor.remeasureFonts();
             (window as any).sketchDebug.editors.forEach(
               (editor: any, index: number) => {
                 if (editor && editor.layout) {
