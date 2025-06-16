@@ -447,10 +447,8 @@ export class MobileChat extends LitElement {
 
           return html`
             <div class="tool-call-item ${toolCall.name}">
-              <span class="tool-status-icon">${statusIcon}</span>
               <span class="tool-name">${toolCall.name}</span>
               <span class="tool-summary">${summary}</span>
-              ${duration ? html`<span class="tool-duration">${duration}</span>` : ""}
             </div>
           `;
         })}
@@ -459,13 +457,8 @@ export class MobileChat extends LitElement {
   }
 
   private getToolStatusIcon(toolCall: any): string {
-    if (!toolCall.result_message) {
-      return "⏳"; // pending
-    }
-    if (toolCall.result_message.tool_error) {
-      return "❌"; // error
-    }
-    return "✅"; // success
+    // Don't show status icons for mobile
+    return "";
   }
 
   private getToolSummary(toolCall: any): string {
@@ -533,11 +526,8 @@ export class MobileChat extends LitElement {
   }
 
   private getToolDuration(toolCall: any): string {
-    if (!toolCall.result_message?.elapsed) {
-      return "";
-    }
-    const seconds = toolCall.result_message.elapsed / 1e9;
-    return seconds < 1 ? "<1s" : `${seconds.toFixed(1)}s`;
+    // Don't show duration for mobile
+    return "";
   }
 
   render() {
