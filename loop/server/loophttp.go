@@ -127,8 +127,6 @@ type Server struct {
 	terminalSessions map[string]*terminalSession
 	sshAvailable     bool
 	sshError         string
-	// WaitGroup for clients waiting for end
-	endWaitGroup sync.WaitGroup
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -767,29 +765,9 @@ func New(agent loop.CodingAgent, logFile *os.File) (*Server, error) {
 		// Log that we're shutting down
 		slog.Info("Ending session", "reason", endReason)
 
-		// Wait for skaband clients that are waiting for end (with timeout)
+		// Give a brief moment for the response to be sent before exiting
 		go func() {
-			startTime := time.Now()
-			// Wait up to 2 seconds for waiting clients to receive the end message
-			done := make(chan struct{})
-			go func() {
-				s.endWaitGroup.Wait()
-				close(done)
-			}()
-
-			select {
-			case <-done:
-				slog.Info("All waiting clients notified of end")
-			case <-time.After(2 * time.Second):
-				slog.Info("Timeout waiting for clients, proceeding with shutdown")
-			}
-
-			// Ensure we've been running for at least 100ms to allow response to be sent
-			elapsed := time.Since(startTime)
-			if elapsed < 100*time.Millisecond {
-				time.Sleep(100*time.Millisecond - elapsed)
-			}
-
+			time.Sleep(100 * time.Millisecond)
 			os.Exit(0)
 		}()
 	})
@@ -1107,17 +1085,6 @@ func (s *Server) handleSSEStream(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid 'from' parameter", http.StatusBadRequest)
 			return
 		}
-	}
-
-	// Check if this client is waiting for end
-	waitForEnd := r.URL.Query().Get("wait_for_end") == "true"
-	if waitForEnd {
-		s.endWaitGroup.Add(1)
-		defer func() {
-			if waitForEnd {
-				s.endWaitGroup.Done()
-			}
-		}()
 	}
 
 	// Ensure 'from' is valid
