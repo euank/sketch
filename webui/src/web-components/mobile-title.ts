@@ -13,6 +13,9 @@ export class MobileTitle extends LitElement {
   @property({ type: String })
   skabandAddr?: string;
 
+  @property({ type: String })
+  currentView: "chat" | "diff" = "chat";
+
   static styles = css`
     :host {
       display: block;
@@ -25,6 +28,35 @@ export class MobileTitle extends LitElement {
       display: flex;
       align-items: center;
       justify-content: space-between;
+    }
+
+    .nav-container {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 8px;
+    }
+
+    .nav-button {
+      background: none;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: #6c757d;
+    }
+
+    .nav-button.active {
+      background-color: #007acc;
+      color: white;
+    }
+
+    .nav-button:not(.active):hover {
+      background-color: #e9ecef;
+      color: #495057;
     }
 
     .title {
@@ -147,6 +179,17 @@ export class MobileTitle extends LitElement {
     }
   }
 
+  private handleNavClick(view: "chat" | "diff") {
+    if (view !== this.currentView) {
+      const event = new CustomEvent("view-change", {
+        detail: { view },
+        bubbles: true,
+        composed: true,
+      });
+      this.dispatchEvent(event);
+    }
+  }
+
   render() {
     return html`
       <div class="title-container">
@@ -180,6 +223,21 @@ export class MobileTitle extends LitElement {
                 <span>${this.getStatusText()}</span>
               `}
         </div>
+      </div>
+
+      <div class="nav-container">
+        <button
+          class="nav-button ${this.currentView === "chat" ? "active" : ""}"
+          @click=${() => this.handleNavClick("chat")}
+        >
+          Chat
+        </button>
+        <button
+          class="nav-button ${this.currentView === "diff" ? "active" : ""}"
+          @click=${() => this.handleNavClick("diff")}
+        >
+          Diff
+        </button>
       </div>
     `;
   }

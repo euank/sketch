@@ -135,6 +135,10 @@ export class CodeDiffEditor extends LitElement {
   // Editable state
   @property({ type: Boolean, attribute: "editable-right" })
   editableRight?: boolean;
+
+  // Inline diff mode (for mobile)
+  @property({ type: Boolean, attribute: "inline" })
+  inline?: boolean;
   private container: Ref<HTMLElement> = createRef();
   editor?: monaco.editor.IStandaloneDiffEditor;
 
@@ -704,7 +708,7 @@ export class CodeDiffEditor extends LitElement {
           automaticLayout: false, // We'll resize manually
           readOnly: true,
           theme: "vs", // Always use light mode
-          renderSideBySide: true,
+          renderSideBySide: !this.inline,
           ignoreTrimWhitespace: false,
           renderOverviewRuler: false, // Disable the overview ruler
           scrollbar: {
