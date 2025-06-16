@@ -58,10 +58,19 @@ export class MobileShell extends LitElement {
     mobile-chat {
       flex: 1;
       overflow: hidden;
+      min-height: 0;
+    }
+
+    mobile-diff {
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
     }
 
     mobile-chat-input {
       flex-shrink: 0;
+      /* Ensure proper height calculation */
+      min-height: 64px;
     }
   `;
 

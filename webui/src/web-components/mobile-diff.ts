@@ -22,11 +22,15 @@ export class MobileDiff extends LitElement {
   @state()
   private baseCommit: string = "";
 
+  @state()
+  private fileExpandStates: Map<string, boolean> = new Map();
+
   static styles = css`
     :host {
       display: flex;
       flex-direction: column;
       height: 100%;
+      min-height: 0;
       overflow: hidden;
       background-color: #ffffff;
     }
@@ -37,6 +41,8 @@ export class MobileDiff extends LitElement {
       flex: 1;
       overflow: auto;
       min-height: 0;
+      /* Ensure proper scrolling behavior */
+      -webkit-overflow-scrolling: touch;
     }
 
     .loading,
@@ -57,7 +63,11 @@ export class MobileDiff extends LitElement {
     }
 
     .file-diff {
-      margin-bottom: 20px;
+      margin-bottom: 16px;
+    }
+
+    .file-diff:last-child {
+      margin-bottom: 0;
     }
 
     .file-header {
@@ -114,6 +124,9 @@ export class MobileDiff extends LitElement {
       border: 1px solid #e9ecef;
       border-top: none;
       min-height: 200px;
+      /* Prevent artifacts */
+      overflow: hidden;
+      background-color: #ffffff;
     }
 
     sketch-monaco-view {
@@ -261,17 +274,83 @@ export class MobileDiff extends LitElement {
     return file.path;
   }
 
+  private toggleFileExpansion(filePath: string) {
+    const currentState = this.fileExpandStates.get(filePath) ?? false;
+    const newState = !currentState;
+    this.fileExpandStates.set(filePath, newState);
+
+    // Apply to the specific Monaco view component for this file
+    const monacoView = this.shadowRoot?.querySelector(
+      `sketch-monaco-view[data-file-path="${filePath}"]`,
+    );
+    if (monacoView) {
+      (monacoView as any).toggleHideUnchangedRegions(!newState); // inverted because true means "hide unchanged"
+    }
+
+    // Force a re-render to update the button state
+    this.requestUpdate();
+  }
+
+  private renderExpandAllIcon() {
+    return html`
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <!-- Dotted line in the middle -->
+        <line
+          x1="2"
+          y1="8"
+          x2="14"
+          y2="8"
+          stroke="currentColor"
+          stroke-width="1"
+          stroke-dasharray="2,1"
+        />
+        <!-- Large arrow pointing up -->
+        <path d="M8 2 L5 6 L11 6 Z" fill="currentColor" />
+        <!-- Large arrow pointing down -->
+        <path d="M8 14 L5 10 L11 10 Z" fill="currentColor" />
+      </svg>
+    `;
+  }
+
+  private renderCollapseIcon() {
+    return html`
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <!-- Dotted line in the middle -->
+        <line
+          x1="2"
+          y1="8"
+          x2="14"
+          y2="8"
+          stroke="currentColor"
+          stroke-width="1"
+          stroke-dasharray="2,1"
+        />
+        <!-- Large arrow pointing down towards line -->
+        <path d="M8 6 L5 2 L11 2 Z" fill="currentColor" />
+        <!-- Large arrow pointing up towards line -->
+        <path d="M8 10 L5 14 L11 14 Z" fill="currentColor" />
+      </svg>
+    `;
+  }
+
   private renderFileDiff(file: GitDiffFile) {
     const content = this.fileContents.get(file.path);
+    const isExpanded = this.fileExpandStates.get(file.path) ?? false;
+    
     if (!content) {
       return html`
         <div class="file-diff">
           <div class="file-header">
-            <span class="file-status ${this.getFileStatusClass(file.status)}">
-              ${this.getFileStatusText(file.status)}
-            </span>
-            ${this.getPathInfo(file)}
-            ${this.getChangesInfo(file) ? html`<span class="file-changes">${this.getChangesInfo(file)}</span>` : ""}
+            <div class="file-header-left">
+              <span class="file-status ${this.getFileStatusClass(file.status)}">
+                ${this.getFileStatusText(file.status)}
+              </span>
+              ${this.getPathInfo(file)}
+              ${this.getChangesInfo(file) ? html`<span class="file-changes">${this.getChangesInfo(file)}</span>` : ""}
+            </div>
+            <button class="file-expand-button" disabled>
+              ${this.renderExpandAllIcon()}
+            </button>
           </div>
           <div class="monaco-container">
             <div class="loading">Loading ${file.path}...</div>
@@ -283,11 +362,22 @@ export class MobileDiff extends LitElement {
     return html`
       <div class="file-diff">
         <div class="file-header">
-          <span class="file-status ${this.getFileStatusClass(file.status)}">
-            ${this.getFileStatusText(file.status)}
-          </span>
-          ${this.getPathInfo(file)}
-          ${this.getChangesInfo(file) ? html`<span class="file-changes">${this.getChangesInfo(file)}</span>` : ""}
+          <div class="file-header-left">
+            <span class="file-status ${this.getFileStatusClass(file.status)}">
+              ${this.getFileStatusText(file.status)}
+            </span>
+            ${this.getPathInfo(file)}
+            ${this.getChangesInfo(file) ? html`<span class="file-changes">${this.getChangesInfo(file)}</span>` : ""}
+          </div>
+          <button
+            class="file-expand-button"
+            @click="${() => this.toggleFileExpansion(file.path)}"
+            title="${isExpanded
+              ? "Collapse: Hide unchanged regions to focus on changes"
+              : "Expand: Show all lines including unchanged regions"}"
+          >
+            ${isExpanded ? this.renderCollapseIcon() : this.renderExpandAllIcon()}
+          </button>
         </div>
         <div class="monaco-container">
           <sketch-monaco-view
@@ -297,6 +387,7 @@ export class MobileDiff extends LitElement {
             .modifiedFilename="${file.path}"
             ?readOnly="true"
             ?inline="true"
+            data-file-path="${file.path}"
           ></sketch-monaco-view>
         </div>
       </div>
