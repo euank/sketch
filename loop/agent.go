@@ -2041,63 +2041,60 @@ func parseGitLog(output string) []GitCommit {
 		return commits
 	}
 
-	// Use a simpler approach: scan through the output looking for commit patterns
-	// Each commit starts with a hash followed by null bytes, ends with shortstat line(s)
-	lines := strings.Split(output, "\n")
-	var currentCommit *GitCommit
-	var commitLines []string
+	// Split by double newlines to separate commit entries
+	// Each commit entry is: hash\0subject\0body\0\0\n shortstat
+	commitEntries := strings.Split(output, "\n\n")
 
-	for _, line := range lines {
-		// Check if this line contains null bytes (start of commit info)
-		if strings.Contains(line, "\x00") {
-			// Process the previous commit if we have one
-			if currentCommit != nil {
-				// Look for shortstat in the accumulated lines
-				for _, commitLine := range commitLines {
-					if commitLine != "" && (strings.Contains(commitLine, "changed") || strings.Contains(commitLine, "insertion") || strings.Contains(commitLine, "deletion")) {
-						a, d := parseShortstat(commitLine)
-						currentCommit.LinesAdded = a
-						currentCommit.LinesDeleted = d
-						break
-					}
-				}
-				commits = append(commits, *currentCommit)
-			}
-
-			// Start new commit
-			parts := strings.Split(line, "\x00")
-			if len(parts) >= 2 {
-				hash := strings.TrimSpace(parts[0])
-				subject := strings.TrimSpace(parts[1])
-				body := ""
-				if len(parts) > 2 {
-					body = strings.TrimSpace(parts[2])
-				}
-
-				currentCommit = &GitCommit{
-					Hash:    hash,
-					Subject: subject,
-					Body:    body,
-				}
-				commitLines = []string{}
-			}
-		} else if currentCommit != nil {
-			// Accumulate lines for the current commit
-			commitLines = append(commitLines, strings.TrimSpace(line))
+	for _, entry := range commitEntries {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
 		}
-	}
 
-	// Process the last commit
-	if currentCommit != nil {
-		for _, commitLine := range commitLines {
-			if commitLine != "" && (strings.Contains(commitLine, "changed") || strings.Contains(commitLine, "insertion") || strings.Contains(commitLine, "deletion")) {
-				a, d := parseShortstat(commitLine)
-				currentCommit.LinesAdded = a
-				currentCommit.LinesDeleted = d
+		// Look for the double null bytes pattern
+		doubleNullIdx := strings.Index(entry, "\x00\x00")
+		if doubleNullIdx == -1 {
+			continue // No double null bytes, skip this entry
+		}
+
+		// Split into commit info and shortstat parts
+		commitInfo := entry[:doubleNullIdx]
+		shortstatPart := entry[doubleNullIdx+2:] // Skip the double null bytes
+
+		// Parse the commit info: hash\0subject\0body
+		parts := strings.Split(commitInfo, "\x00")
+		if len(parts) < 2 {
+			continue
+		}
+
+		hash := strings.TrimSpace(parts[0])
+		subject := strings.TrimSpace(parts[1])
+		body := ""
+		if len(parts) > 2 {
+			body = strings.TrimSpace(parts[2])
+		}
+
+		// Parse shortstat from the shortstat part
+		linesAdded := 0
+		linesDeleted := 0
+		shortstatLines := strings.Split(shortstatPart, "\n")
+		for _, line := range shortstatLines {
+			line = strings.TrimSpace(line)
+			if line != "" && (strings.Contains(line, "changed") || strings.Contains(line, "insertion") || strings.Contains(line, "deletion")) {
+				a, d := parseShortstat(line)
+				linesAdded = a
+				linesDeleted = d
 				break
 			}
 		}
-		commits = append(commits, *currentCommit)
+
+		commits = append(commits, GitCommit{
+			Hash:         hash,
+			Subject:      subject,
+			Body:         body,
+			LinesAdded:   linesAdded,
+			LinesDeleted: linesDeleted,
+		})
 	}
 
 	return commits
