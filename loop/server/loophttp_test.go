@@ -263,6 +263,9 @@ func (m *mockAgent) GetPortMonitor() *loop.PortMonitor { return loop.NewPortMoni
 func (m *mockAgent) SkabandAddr() string               { return m.skabandAddr }
 func (m *mockAgent) LinkToGitHub() bool                { return false }
 func (m *mockAgent) DiffStats() (int, int)             { return 0, 0 }
+func (m *mockAgent) PushMergeQueueFailure(ctx context.Context, failedHash string, originalBranch string) error {
+	return nil
+}
 
 // TestSSEStream tests the SSE stream endpoint
 func TestSSEStream(t *testing.T) {

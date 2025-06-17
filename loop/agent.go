@@ -121,6 +121,9 @@ type CodingAgent interface {
 	// DetectGitChanges checks for new git commits and pushes them if found
 	DetectGitChanges(ctx context.Context) error
 
+	// PushMergeQueueFailure pushes a failed merge queue hash to a special ref for user access
+	PushMergeQueueFailure(ctx context.Context, failedHash string, originalBranch string) error
+
 	// OutstandingLLMCallCount returns the number of outstanding LLM calls.
 	OutstandingLLMCallCount() int
 
@@ -1690,6 +1693,12 @@ func (a *Agent) DetectGitChanges(ctx context.Context) error {
 	return nil
 }
 
+// PushMergeQueueFailure pushes a failed merge queue hash to a special ref for user access
+// The ref format is: refs/queue/queue-{originalBranch}-{timestamp}
+func (a *Agent) PushMergeQueueFailure(ctx context.Context, failedHash string, originalBranch string) error {
+	return a.gitState.PushFailedMergeQueueHash(ctx, a.repoRoot, failedHash, originalBranch)
+}
+
 // processGitChanges checks for new git commits, runs autoformatters if needed, and returns any messages generated
 // This is used internally by the agent loop
 func (a *Agent) processGitChanges(ctx context.Context) []string {
@@ -2034,6 +2043,40 @@ func (ags *AgentGitState) handleGitCommits(ctx context.Context, sessionID string
 		msgs = append(msgs, msg)
 	}
 	return msgs, commits, nil
+}
+
+// PushFailedMergeQueueHash pushes a failed merge queue hash to a special ref format
+// refs/queue/queue-{branch}-{timestamp} where timestamp is in YYYYMMDDHHNN format
+func (ags *AgentGitState) PushFailedMergeQueueHash(ctx context.Context, repoRoot string, failedHash string, originalBranch string) error {
+	ags.mu.Lock()
+	defer ags.mu.Unlock()
+
+	// Skip if no remote address configured
+	if ags.gitRemoteAddr == "" {
+		return fmt.Errorf("no git remote address configured")
+	}
+
+	// Generate timestamp in YYYYMMDDHHNN format
+	now := time.Now()
+	timestamp := now.Format("200601021504") // Go's reference time in the required format
+
+	// Create the special ref name: refs/queue/queue-{branch}-{timestamp}
+	queueRef := fmt.Sprintf("refs/queue/queue-%s-%s", originalBranch, timestamp)
+
+	// Push the failed hash to the special ref
+	cmd := exec.CommandContext(ctx, "git", "push", ags.gitRemoteAddr, failedHash+":"+queueRef)
+	cmd.Dir = repoRoot
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to push merge queue failure to %s: %w - %s", queueRef, err, string(out))
+	}
+
+	slog.InfoContext(ctx, "pushed failed merge queue hash",
+		"hash", failedHash,
+		"ref", queueRef,
+		"branch", originalBranch)
+
+	return nil
 }
 
 func cleanSlugName(s string) string {
