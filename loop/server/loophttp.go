@@ -334,6 +334,73 @@ func New(agent loop.CodingAgent, logFile *os.File) (*Server, error) {
 		}
 	})
 
+	// Handler for /messages/page?limit=N&before=M for paginated message retrieval
+	// This endpoint supports incremental loading by fetching messages in pages
+	s.mux.HandleFunc("/messages/page", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		// Extract query parameters
+		limitParam := r.URL.Query().Get("limit")
+		beforeParam := r.URL.Query().Get("before")
+
+		// Default limit if not specified
+		limit := 50
+		if limitParam != "" {
+			var err error
+			limit, err = strconv.Atoi(limitParam)
+			if err != nil || limit <= 0 || limit > 500 {
+				http.Error(w, "Invalid 'limit' parameter (must be 1-500)", http.StatusBadRequest)
+				return
+			}
+		}
+
+		currentCount := agent.MessageCount()
+
+		// Determine the end index (before which messages to fetch)
+		var end int
+		if beforeParam != "" {
+			var err error
+			end, err = strconv.Atoi(beforeParam)
+			if err != nil || end < 0 || end > currentCount {
+				http.Error(w, "Invalid 'before' parameter", http.StatusBadRequest)
+				return
+			}
+		} else {
+			// If no 'before' specified, fetch the most recent messages
+			end = currentCount
+		}
+
+		// Calculate start index
+		start := max(0, end-limit)
+
+		// Fetch the messages
+		messages := agent.Messages(start, end)
+
+		// Create response with pagination metadata
+		response := struct {
+			Messages   []loop.AgentMessage `json:"messages"`
+			TotalCount int                 `json:"total_count"`
+			Start      int                 `json:"start"`
+			End        int                 `json:"end"`
+			HasMore    bool                `json:"has_more"`
+		}{
+			Messages:   messages,
+			TotalCount: currentCount,
+			Start:      start,
+			End:        end,
+			HasMore:    start > 0,
+		}
+
+		// Create a JSON encoder with indentation for pretty-printing
+		encoder := json.NewEncoder(w)
+		encoder.SetIndent("", "  ")
+
+		err := encoder.Encode(response)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
 	// Handler for /logs - displays the contents of the log file
 	s.mux.HandleFunc("/logs", func(w http.ResponseWriter, r *http.Request) {
 		if s.logFile == nil {

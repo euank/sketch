@@ -974,8 +974,10 @@ export class SketchAppShell extends LitElement {
   private handleDataChanged(eventData: {
     state: State;
     newMessages: AgentMessage[];
+    isOlderMessages?: boolean;
+    allMessages?: AgentMessage[];
   }): void {
-    const { state, newMessages } = eventData;
+    const { state, newMessages, isOlderMessages, allMessages } = eventData;
 
     // Update state if we received it
     if (state) {
@@ -997,7 +999,16 @@ export class SketchAppShell extends LitElement {
     }
 
     // Update messages
-    this.messages = aggregateAgentMessages(this.messages, newMessages);
+    if (isOlderMessages && allMessages) {
+      // For incremental loading of older messages, use the complete list
+      this.messages = allMessages;
+    } else {
+      // For new messages, use aggregation
+      this.messages = aggregateAgentMessages(this.messages, newMessages);
+    }
+    
+    // Trigger re-render to update incremental loading state
+    this.requestUpdate();
 
     // Process new messages to find commit messages
     // Update last commit info via container status component
@@ -1358,6 +1369,9 @@ export class SketchAppShell extends LitElement {
                 .firstMessageIndex=${this.containerState?.first_message_index ||
                 0}
                 .state=${this.containerState}
+                .hasMoreOlderMessages=${this.dataManager.hasMoreOlder()}
+                .isLoadingOlderMessages=${this.dataManager.isLoadingOlder()}
+                .onLoadOlderMessages=${() => this.dataManager.loadOlderMessages()}
               ></sketch-timeline>
             </div>
           </div>

@@ -31,6 +31,13 @@ export class DataManager {
   private maxReconnectDelayMs: number = 60000; // Max delay of 60 seconds
   private baseReconnectDelayMs: number = 1000; // Start with 1 second
 
+  // Incremental loading state
+  private loadedOldestMessageIndex: number = -1; // Track the oldest message we've loaded
+  private hasMoreOlderMessages: boolean = true; // Whether there are more older messages to load
+  private isLoadingOlderMessages: boolean = false; // Loading state
+  private readonly initialPageSize: number = 100; // Number of messages to load initially
+  private readonly pageSize: number = 50; // Number of messages to load per page
+
   // Event listeners
   private eventListeners: Map<
     DataManagerEventType,
@@ -47,11 +54,50 @@ export class DataManager {
   }
 
   /**
-   * Initialize the data manager and connect to the SSE stream
+   * Initialize the data manager and load initial messages, then connect to the SSE stream
    */
   public async initialize(): Promise<void> {
-    // Connect to the SSE stream
+    // Load initial messages first
+    await this.loadInitialMessages();
+    
+    // Then connect to the SSE stream for real-time updates
     this.connect();
+  }
+
+  /**
+   * Load the initial set of recent messages
+   */
+  private async loadInitialMessages(): Promise<void> {
+    try {
+      const response = await fetch(`/messages/page?limit=${this.initialPageSize}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      this.messages = data.messages || [];
+      this.hasMoreOlderMessages = data.has_more || false;
+      
+      // Set the oldest loaded message index
+      if (this.messages.length > 0) {
+        this.loadedOldestMessageIndex = Math.min(...this.messages.map(m => m.idx));
+      }
+      
+      this.isFirstLoad = false;
+      
+      // Emit event for initial load
+      this.emitEvent("dataChanged", {
+        state: this.timelineState,
+        newMessages: this.messages,
+        isFirstFetch: true,
+      });
+    } catch (error) {
+      console.error("Error loading initial messages:", error);
+      // Fall back to empty state and continue with SSE connection
+      this.messages = [];
+      this.hasMoreOlderMessages = false;
+      this.isFirstLoad = false;
+    }
   }
 
   /**
@@ -76,7 +122,7 @@ export class DataManager {
     // Determine the starting point for the stream based on what we already have
     const fromIndex =
       this.messages.length > 0
-        ? this.messages[this.messages.length - 1].idx + 1
+        ? Math.max(...this.messages.map(m => m.idx)) + 1
         : 0;
 
     // Create a new EventSource connection
@@ -242,6 +288,73 @@ export class DataManager {
    */
   public getIsFirstLoad(): boolean {
     return this.isFirstLoad;
+  }
+
+  /**
+   * Load older messages for incremental loading
+   */
+  public async loadOlderMessages(): Promise<boolean> {
+    if (this.isLoadingOlderMessages || !this.hasMoreOlderMessages) {
+      return false;
+    }
+
+    this.isLoadingOlderMessages = true;
+    
+    try {
+      const before = this.loadedOldestMessageIndex;
+      const response = await fetch(`/messages/page?limit=${this.pageSize}&before=${before}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const olderMessages = data.messages || [];
+      
+      if (olderMessages.length > 0) {
+        // Prepend older messages to the beginning of the array
+        this.messages = [...olderMessages, ...this.messages];
+        
+        // Update the oldest loaded message index
+        this.loadedOldestMessageIndex = Math.min(...olderMessages.map(m => m.idx));
+        
+        // Update hasMoreOlderMessages flag
+        this.hasMoreOlderMessages = data.has_more || false;
+        
+        // Emit event with the complete message list
+        this.emitEvent("dataChanged", {
+          state: this.timelineState,
+          newMessages: [], // Don't pass individual messages
+          isFirstFetch: false,
+          isOlderMessages: true,
+          allMessages: this.messages, // Pass complete message list
+        });
+        
+        return true;
+      } else {
+        this.hasMoreOlderMessages = false;
+        return false;
+      }
+    } catch (error) {
+      console.error("Error loading older messages:", error);
+      return false;
+    } finally {
+      this.isLoadingOlderMessages = false;
+    }
+  }
+
+  /**
+   * Check if there are more older messages to load
+   */
+  public hasMoreOlder(): boolean {
+    return this.hasMoreOlderMessages;
+  }
+
+  /**
+   * Check if currently loading older messages
+   */
+  public isLoadingOlder(): boolean {
+    return this.isLoadingOlderMessages;
   }
 
   /**

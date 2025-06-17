@@ -34,6 +34,20 @@ export class SketchTimeline extends LitElement {
   @property({ attribute: false })
   state: State | null = null;
 
+  // Incremental loading properties
+  @property({ attribute: false })
+  hasMoreOlderMessages: boolean = false;
+
+  @property({ attribute: false })
+  isLoadingOlderMessages: boolean = false;
+
+  @property({ attribute: false })
+  onLoadOlderMessages?: () => Promise<boolean>;
+
+  // Scroll detection state
+  @state()
+  private isNearTop: boolean = false;
+
   static styles = css`
     /* Hide views initially to prevent flash of content */
     .timeline-container .timeline,
@@ -185,6 +199,69 @@ export class SketchTimeline extends LitElement {
         transform: scale(1.2);
       }
     }
+
+    /* Load more container and button styles */
+    .load-more-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      margin-bottom: 10px;
+    }
+
+    .load-more-button {
+      background-color: #f1f1f1;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #666;
+      transition: all 0.2s ease;
+    }
+
+    .load-more-button:hover {
+      background-color: #e9e9e9;
+      border-color: #ccc;
+      color: #333;
+    }
+
+    .loading-indicator {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .loading-dots {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      height: 14px;
+    }
+
+    .loading-dots .dot {
+      width: 6px;
+      height: 6px;
+      background-color: #888;
+      border-radius: 50%;
+      opacity: 0.6;
+    }
+
+    .loading-dots .dot:nth-child(1) {
+      animation: pulse 1.5s infinite ease-in-out;
+    }
+
+    .loading-dots .dot:nth-child(2) {
+      animation: pulse 1.5s infinite ease-in-out 0.3s;
+    }
+
+    .loading-dots .dot:nth-child(3) {
+      animation: pulse 1.5s infinite ease-in-out 0.6s;
+    }
   `;
 
   constructor() {
@@ -280,6 +357,29 @@ export class SketchTimeline extends LitElement {
     }
   }
 
+  /**
+   * Handle loading older messages when scrolling near the top
+   */
+  private async handleLoadOlderMessages() {
+    if (!this.onLoadOlderMessages || this.isLoadingOlderMessages || !this.hasMoreOlderMessages) {
+      return;
+    }
+
+    try {
+      const success = await this.onLoadOlderMessages();
+      if (success) {
+        // Scroll down a bit to maintain the user's position relative to the messages they were viewing
+        setTimeout(() => {
+          if (this.scrollContainer.value) {
+            this.scrollContainer.value.scrollTop += 200;
+          }
+        }, 50);
+      }
+    } catch (error) {
+      console.error("Error loading older messages:", error);
+    }
+  }
+
   private _handleScroll(event) {
     if (!this.scrollContainer.value) return;
 
@@ -288,6 +388,18 @@ export class SketchTimeline extends LitElement {
       Math.abs(
         container.scrollHeight - container.clientHeight - container.scrollTop,
       ) <= 3; // Increased tolerance to 3px for better detection
+
+    // Check if user is near the top for loading older messages
+    const isNearTop = container.scrollTop <= 200; // Within 200px of the top
+    
+    if (isNearTop !== this.isNearTop) {
+      this.isNearTop = isNearTop;
+      
+      // Trigger loading older messages when near top
+      if (this.isNearTop && this.hasMoreOlderMessages && !this.isLoadingOlderMessages) {
+        this.handleLoadOlderMessages();
+      }
+    }
 
     if (isAtBottom) {
       this.scrollingState = "pinToLatest";
@@ -380,6 +492,31 @@ export class SketchTimeline extends LitElement {
       <div style="position: relative; height: 100%;">
         <div id="scroll-container">
           <div class="timeline-container">
+            ${this.hasMoreOlderMessages
+              ? html`
+                  <div class="load-more-container">
+                    ${this.isLoadingOlderMessages
+                      ? html`
+                          <div class="loading-indicator">
+                            <div class="loading-dots">
+                              <div class="dot"></div>
+                              <div class="dot"></div>
+                              <div class="dot"></div>
+                            </div>
+                            <span>Loading older messages...</span>
+                          </div>
+                        `
+                      : html`
+                          <button
+                            class="load-more-button"
+                            @click=${this.handleLoadOlderMessages}
+                          >
+                            Load older messages
+                          </button>
+                        `}
+                  </div>
+                `
+              : ""}
             ${repeat(
               this.messages.filter((msg) => !msg.hide_output),
               this.messageKey,
