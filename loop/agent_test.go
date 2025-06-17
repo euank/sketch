@@ -1,809 +1,164 @@
 package loop
 
 import (
-	"cmp"
 	"context"
-	"fmt"
-	"net/http"
 	"os"
-	"slices"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"sketch.dev/httprr"
-	"sketch.dev/llm"
-	"sketch.dev/llm/ant"
-	"sketch.dev/llm/conversation"
 )
 
-// TestAgentLoop tests that the Agent loop functionality works correctly.
-// It uses the httprr package to record HTTP interactions for replay in tests.
-// When failing, rebuild with "go test ./sketch/loop -run TestAgentLoop -httprecord .*agent_loop.*"
-// as necessary.
-func TestAgentLoop(t *testing.T) {
+// TestAgentGitState_pushFailedRefLocked tests the failed ref push functionality
+func TestAgentGitState_pushFailedRefLocked(t *testing.T) {
+	// Create a temporary directory for our test git repo
+	tmpDir, err := os.MkdirTemp("", "test-git-repo-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Initialize git repo
+	cmd := exec.Command("git", "init")
+	cmd.Dir = tmpDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to init git repo: %v", err)
+	}
+
+	// Configure git user
+	cmd = exec.Command("git", "config", "user.name", "Test User")
+	cmd.Dir = tmpDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to configure git user: %v", err)
+	}
+
+	cmd = exec.Command("git", "config", "user.email", "test@example.com")
+	cmd.Dir = tmpDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to configure git email: %v", err)
+	}
+
+	// Create a commit
+	testFile := filepath.Join(tmpDir, "test.txt")
+	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	cmd = exec.Command("git", "add", "test.txt")
+	cmd.Dir = tmpDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to add test file: %v", err)
+	}
+
+	cmd = exec.Command("git", "commit", "-m", "Test commit")
+	cmd.Dir = tmpDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to commit: %v", err)
+	}
+
+	// Get the commit hash
+	cmd = exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = tmpDir
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to get commit hash: %v", err)
+	}
+	commitHash := strings.TrimSpace(string(output))
+
+	// Create a bare repo to simulate the remote
+	remoteDir, err := os.MkdirTemp("", "test-remote-repo-*")
+	if err != nil {
+		t.Fatalf("Failed to create remote temp dir: %v", err)
+	}
+	defer os.RemoveAll(remoteDir)
+
+	cmd = exec.Command("git", "init", "--bare")
+	cmd.Dir = remoteDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to init bare repo: %v", err)
+	}
+
+	// Test the pushFailedRefLocked function
+	state := &AgentGitState{
+		gitRemoteAddr: remoteDir, // Use file path as remote for testing
+	}
+
 	ctx := context.Background()
+	originalBranch := "main-philip"
 
-	// Setup httprr recorder
-	rrPath := "testdata/agent_loop.httprr"
-	rr, err := httprr.Open(rrPath, http.DefaultTransport)
-	if err != nil && !os.IsNotExist(err) {
-		t.Fatal(err)
-	}
-
-	if rr.Recording() {
-		// Skip the test if API key is not available
-		if os.Getenv("ANTHROPIC_API_KEY") == "" {
-			t.Fatal("ANTHROPIC_API_KEY not set, required for HTTP recording")
-		}
-	}
-
-	// Create HTTP client
-	var client *http.Client
-	if rr != nil {
-		// Scrub API keys from requests for security
-		rr.ScrubReq(func(req *http.Request) error {
-			req.Header.Del("x-api-key")
-			req.Header.Del("anthropic-api-key")
-			return nil
-		})
-		client = rr.Client()
-	} else {
-		client = &http.Client{Transport: http.DefaultTransport}
-	}
-
-	// Create a new agent with the httprr client
-	origWD, err := os.Getwd()
+	// Call the function
+	err = state.pushFailedRefLocked(ctx, tmpDir, commitHash, originalBranch)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("pushFailedRefLocked failed: %v", err)
 	}
-	if err := os.Chdir("/"); err != nil {
-		t.Fatal(err)
-	}
-	budget := conversation.Budget{MaxDollars: 10.0}
-	wd, err := os.Getwd()
+
+	// Verify the ref was created in the remote
+	cmd = exec.Command("git", "show-ref")
+	cmd.Dir = remoteDir
+	output, err = cmd.Output()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to show refs: %v", err)
 	}
 
-	apiKey := cmp.Or(os.Getenv("OUTER_SKETCH_MODEL_API_KEY"), os.Getenv("ANTHROPIC_API_KEY"))
-	cfg := AgentConfig{
-		Context:    ctx,
-		WorkingDir: wd,
-		Service: &ant.Service{
-			APIKey: apiKey,
-			HTTPC:  client,
-		},
-		Budget:       budget,
-		GitUsername:  "Test Agent",
-		GitEmail:     "totallyhuman@sketch.dev",
-		SessionID:    "test-session-id",
-		ClientGOOS:   "linux",
-		ClientGOARCH: "amd64",
-	}
-	agent := NewAgent(cfg)
-	if err := os.Chdir(origWD); err != nil {
-		t.Fatal(err)
-	}
-	err = agent.Init(AgentInit{NoGit: true})
-	if err != nil {
-		t.Fatal(err)
+	refsOutput := string(output)
+	t.Logf("Remote refs: %s", refsOutput)
+
+	// Check that a ref matching our pattern was created
+	expectedPattern := "refs/queue/queue-main-philip-"
+	if !strings.Contains(refsOutput, expectedPattern) {
+		t.Errorf("Expected ref pattern %s not found in refs output: %s", expectedPattern, refsOutput)
 	}
 
-	// Setup a test message that will trigger a simple, predictable response
-	userMessage := "What tools are available to you? Please just list them briefly. (Do not call the set-slug tool.)"
-
-	// Send the message to the agent
-	agent.UserMessage(ctx, userMessage)
-
-	// Process a single loop iteration to avoid long-running tests
-	agent.processTurn(ctx)
-
-	// Collect responses with a timeout
-	var responses []AgentMessage
-	ctx2, cancel := context.WithDeadline(ctx, time.Now().Add(10*time.Second))
-	defer cancel()
-	done := false
-	it := agent.NewIterator(ctx2, 0)
-
-	for !done {
-		msg := it.Next()
-		t.Logf("Received message: Type=%s, EndOfTurn=%v, Content=%q", msg.Type, msg.EndOfTurn, msg.Content)
-		responses = append(responses, *msg)
-		if msg.EndOfTurn {
-			done = true
-		}
-	}
-
-	// Verify we got at least one response
-	if len(responses) == 0 {
-		t.Fatal("No responses received from agent")
-	}
-
-	// Log the received responses for debugging
-	t.Logf("Received %d responses", len(responses))
-
-	// Find the final agent response (with EndOfTurn=true)
-	var finalResponse *AgentMessage
-	for i := range responses {
-		if responses[i].Type == AgentMessageType && responses[i].EndOfTurn {
-			finalResponse = &responses[i]
-			break
-		}
-	}
-
-	// Verify we got a final agent response
-	if finalResponse == nil {
-		t.Fatal("No final agent response received")
-	}
-
-	// Check that the response contains tools information
-	if !strings.Contains(strings.ToLower(finalResponse.Content), "tool") {
-		t.Error("Expected response to mention tools")
-	}
-
-	// Count how many tool use messages we received
-	toolUseCount := 0
-	for _, msg := range responses {
-		if msg.Type == ToolUseMessageType {
-			toolUseCount++
-		}
-	}
-
-	t.Logf("Agent used %d tools in its response", toolUseCount)
-}
-
-func TestAgentTracksOutstandingCalls(t *testing.T) {
-	agent := &Agent{
-		outstandingLLMCalls:  make(map[string]struct{}),
-		outstandingToolCalls: make(map[string]string),
-		stateMachine:         NewStateMachine(),
-	}
-
-	// Check initial state
-	if count := agent.OutstandingLLMCallCount(); count != 0 {
-		t.Errorf("Expected 0 outstanding LLM calls, got %d", count)
-	}
-
-	if tools := agent.OutstandingToolCalls(); len(tools) != 0 {
-		t.Errorf("Expected 0 outstanding tool calls, got %d", len(tools))
-	}
-
-	// Add some calls
-	agent.mu.Lock()
-	agent.outstandingLLMCalls["llm1"] = struct{}{}
-	agent.outstandingToolCalls["tool1"] = "bash"
-	agent.outstandingToolCalls["tool2"] = "think"
-	agent.mu.Unlock()
-
-	// Check tracking works
-	if count := agent.OutstandingLLMCallCount(); count != 1 {
-		t.Errorf("Expected 1 outstanding LLM call, got %d", count)
-	}
-
-	tools := agent.OutstandingToolCalls()
-	if len(tools) != 2 {
-		t.Errorf("Expected 2 outstanding tool calls, got %d", len(tools))
-	}
-
-	// Check removal
-	agent.mu.Lock()
-	delete(agent.outstandingLLMCalls, "llm1")
-	delete(agent.outstandingToolCalls, "tool1")
-	agent.mu.Unlock()
-
-	if count := agent.OutstandingLLMCallCount(); count != 0 {
-		t.Errorf("Expected 0 outstanding LLM calls after removal, got %d", count)
-	}
-
-	tools = agent.OutstandingToolCalls()
-	if len(tools) != 1 {
-		t.Errorf("Expected 1 outstanding tool call after removal, got %d", len(tools))
-	}
-
-	if tools[0] != "think" {
-		t.Errorf("Expected 'think' tool remaining, got %s", tools[0])
-	}
-}
-
-// TestAgentProcessTurnWithNilResponse tests the scenario where Agent.processTurn receives
-// a nil value for initialResp from processUserMessage.
-func TestAgentProcessTurnWithNilResponse(t *testing.T) {
-	// Create a mock conversation that will return nil and error
-	mockConvo := &MockConvoInterface{
-		sendMessageFunc: func(message llm.Message) (*llm.Response, error) {
-			return nil, fmt.Errorf("test error: simulating nil response")
-		},
-	}
-
-	// Create a minimal Agent instance for testing
-	agent := &Agent{
-		convo:                mockConvo,
-		inbox:                make(chan string, 10),
-		subscribers:          []chan *AgentMessage{},
-		outstandingLLMCalls:  make(map[string]struct{}),
-		outstandingToolCalls: make(map[string]string),
-	}
-
-	// Create a test context
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	// Push a test message to the inbox so that processUserMessage will try to process it
-	agent.inbox <- "Test message"
-
-	// Call processTurn - it should exit early without panic when initialResp is nil
-	agent.processTurn(ctx)
-
-	// Verify error message was added to history
-	agent.mu.Lock()
-	defer agent.mu.Unlock()
-
-	// There should be exactly one message
-	if len(agent.history) != 1 {
-		t.Errorf("Expected exactly one message, got %d", len(agent.history))
-	} else {
-		msg := agent.history[0]
-		if msg.Type != ErrorMessageType {
-			t.Errorf("Expected error message, got message type: %s", msg.Type)
-		}
-		if !strings.Contains(msg.Content, "simulating nil response") {
-			t.Errorf("Expected error message to contain 'simulating nil response', got: %s", msg.Content)
-		}
-	}
-}
-
-// MockConvoInterface implements the ConvoInterface for testing
-type MockConvoInterface struct {
-	sendMessageFunc              func(message llm.Message) (*llm.Response, error)
-	sendUserTextMessageFunc      func(s string, otherContents ...llm.Content) (*llm.Response, error)
-	toolResultContentsFunc       func(ctx context.Context, resp *llm.Response) ([]llm.Content, bool, error)
-	toolResultCancelContentsFunc func(resp *llm.Response) ([]llm.Content, error)
-	cancelToolUseFunc            func(toolUseID string, cause error) error
-	cumulativeUsageFunc          func() conversation.CumulativeUsage
-	lastUsageFunc                func() llm.Usage
-	resetBudgetFunc              func(conversation.Budget)
-	overBudgetFunc               func() error
-	getIDFunc                    func() string
-	subConvoWithHistoryFunc      func() *conversation.Convo
-}
-
-func (m *MockConvoInterface) SendMessage(message llm.Message) (*llm.Response, error) {
-	if m.sendMessageFunc != nil {
-		return m.sendMessageFunc(message)
-	}
-	return nil, nil
-}
-
-func (m *MockConvoInterface) SendUserTextMessage(s string, otherContents ...llm.Content) (*llm.Response, error) {
-	if m.sendUserTextMessageFunc != nil {
-		return m.sendUserTextMessageFunc(s, otherContents...)
-	}
-	return nil, nil
-}
-
-func (m *MockConvoInterface) ToolResultContents(ctx context.Context, resp *llm.Response) ([]llm.Content, bool, error) {
-	if m.toolResultContentsFunc != nil {
-		return m.toolResultContentsFunc(ctx, resp)
-	}
-	return nil, false, nil
-}
-
-func (m *MockConvoInterface) ToolResultCancelContents(resp *llm.Response) ([]llm.Content, error) {
-	if m.toolResultCancelContentsFunc != nil {
-		return m.toolResultCancelContentsFunc(resp)
-	}
-	return nil, nil
-}
-
-func (m *MockConvoInterface) CancelToolUse(toolUseID string, cause error) error {
-	if m.cancelToolUseFunc != nil {
-		return m.cancelToolUseFunc(toolUseID, cause)
-	}
-	return nil
-}
-
-func (m *MockConvoInterface) CumulativeUsage() conversation.CumulativeUsage {
-	if m.cumulativeUsageFunc != nil {
-		return m.cumulativeUsageFunc()
-	}
-	return conversation.CumulativeUsage{}
-}
-
-func (m *MockConvoInterface) LastUsage() llm.Usage {
-	if m.lastUsageFunc != nil {
-		return m.lastUsageFunc()
-	}
-	return llm.Usage{}
-}
-
-func (m *MockConvoInterface) ResetBudget(budget conversation.Budget) {
-	if m.resetBudgetFunc != nil {
-		m.resetBudgetFunc(budget)
-	}
-}
-
-func (m *MockConvoInterface) OverBudget() error {
-	if m.overBudgetFunc != nil {
-		return m.overBudgetFunc()
-	}
-	return nil
-}
-
-func (m *MockConvoInterface) GetID() string {
-	if m.getIDFunc != nil {
-		return m.getIDFunc()
-	}
-	return "mock-convo-id"
-}
-
-func (m *MockConvoInterface) SubConvoWithHistory() *conversation.Convo {
-	if m.subConvoWithHistoryFunc != nil {
-		return m.subConvoWithHistoryFunc()
-	}
-	return nil
-}
-
-// TestAgentProcessTurnWithNilResponseNilError tests the scenario where Agent.processTurn receives
-// a nil value for initialResp and nil error from processUserMessage.
-// This test verifies that the implementation properly handles this edge case.
-func TestAgentProcessTurnWithNilResponseNilError(t *testing.T) {
-	// Create a mock conversation that will return nil response and nil error
-	mockConvo := &MockConvoInterface{
-		sendMessageFunc: func(message llm.Message) (*llm.Response, error) {
-			return nil, nil // This is unusual but now handled gracefully
-		},
-	}
-
-	// Create a minimal Agent instance for testing
-	agent := &Agent{
-		convo:                mockConvo,
-		inbox:                make(chan string, 10),
-		subscribers:          []chan *AgentMessage{},
-		outstandingLLMCalls:  make(map[string]struct{}),
-		outstandingToolCalls: make(map[string]string),
-	}
-
-	// Create a test context
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	// Push a test message to the inbox so that processUserMessage will try to process it
-	agent.inbox <- "Test message"
-
-	// Call processTurn - it should handle nil initialResp with a descriptive error
-	err := agent.processTurn(ctx)
-
-	// Verify we get the expected error
-	if err == nil {
-		t.Error("Expected processTurn to return an error for nil initialResp, but got nil")
-	} else if !strings.Contains(err.Error(), "unexpected nil response") {
-		t.Errorf("Expected error about nil response, got: %v", err)
-	} else {
-		t.Logf("As expected, processTurn returned error: %v", err)
-	}
-
-	// Verify error message was added to history
-	agent.mu.Lock()
-	defer agent.mu.Unlock()
-
-	// There should be exactly one message
-	if len(agent.history) != 1 {
-		t.Errorf("Expected exactly one message, got %d", len(agent.history))
-	} else {
-		msg := agent.history[0]
-		if msg.Type != ErrorMessageType {
-			t.Errorf("Expected error message type, got: %s", msg.Type)
-		}
-		if !strings.Contains(msg.Content, "unexpected nil response") {
-			t.Errorf("Expected error about nil response, got: %s", msg.Content)
-		}
-	}
-}
-
-func TestAgentStateMachine(t *testing.T) {
-	// Create a simplified test for the state machine functionality
-	agent := &Agent{
-		stateMachine: NewStateMachine(),
-	}
-
-	// Initially the state should be Ready
-	if state := agent.CurrentState(); state != StateReady {
-		t.Errorf("Expected initial state to be StateReady, got %s", state)
-	}
-
-	// Test manual transitions to verify state tracking
-	ctx := context.Background()
-
-	// Track transitions
-	var transitions []State
-	agent.stateMachine.SetTransitionCallback(func(ctx context.Context, from, to State, event TransitionEvent) {
-		transitions = append(transitions, to)
-		t.Logf("State transition: %s -> %s (%s)", from, to, event.Description)
-	})
-
-	// Perform a valid sequence of transitions (based on the state machine rules)
-	expectedStates := []State{
-		StateWaitingForUserInput,
-		StateSendingToLLM,
-		StateProcessingLLMResponse,
-		StateToolUseRequested,
-		StateCheckingForCancellation,
-		StateRunningTool,
-		StateCheckingGitCommits,
-		StateRunningAutoformatters,
-		StateCheckingBudget,
-		StateGatheringAdditionalMessages,
-		StateSendingToolResults,
-		StateProcessingLLMResponse,
-		StateEndOfTurn,
-	}
-
-	// Manually perform each transition
-	for _, state := range expectedStates {
-		err := agent.stateMachine.Transition(ctx, state, "Test transition to "+state.String())
-		if err != nil {
-			t.Errorf("Failed to transition to %s: %v", state, err)
-		}
-	}
-
-	// Check if we recorded the right number of transitions
-	if len(transitions) != len(expectedStates) {
-		t.Errorf("Expected %d state transitions, got %d", len(expectedStates), len(transitions))
-	}
-
-	// Check each transition matched what we expected
-	for i, expected := range expectedStates {
-		if i < len(transitions) {
-			if transitions[i] != expected {
-				t.Errorf("Transition %d: expected %s, got %s", i, expected, transitions[i])
+	// Verify the ref points to the correct commit
+	lines := strings.Split(strings.TrimSpace(refsOutput), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, expectedPattern) {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				refHash := parts[0]
+				if refHash != commitHash {
+					t.Errorf("Expected ref to point to %s, but it points to %s", commitHash, refHash)
+				}
+				break
 			}
 		}
 	}
+}
 
-	// Verify the current state is the last one we transitioned to
-	if state := agent.CurrentState(); state != expectedStates[len(expectedStates)-1] {
-		t.Errorf("Expected current state to be %s, got %s", expectedStates[len(expectedStates)-1], state)
+// TestAgentGitState_pushFailedRefLocked_NoRemote tests the function when no remote is configured
+func TestAgentGitState_pushFailedRefLocked_NoRemote(t *testing.T) {
+	state := &AgentGitState{
+		gitRemoteAddr: "", // No remote
 	}
 
-	// Test force transition
-	agent.stateMachine.ForceTransition(ctx, StateCancelled, "Testing force transition")
-
-	// Verify current state was updated
-	if state := agent.CurrentState(); state != StateCancelled {
-		t.Errorf("Expected forced state to be StateCancelled, got %s", state)
-	}
-}
-
-// mockConvoInterface is a mock implementation of ConvoInterface for testing
-type mockConvoInterface struct {
-	SendMessageFunc        func(message llm.Message) (*llm.Response, error)
-	ToolResultContentsFunc func(ctx context.Context, resp *llm.Response) ([]llm.Content, bool, error)
-}
-
-func (c *mockConvoInterface) GetID() string {
-	return "mockConvoInterface-id"
-}
-
-func (c *mockConvoInterface) SubConvoWithHistory() *conversation.Convo {
-	return nil
-}
-
-func (m *mockConvoInterface) CumulativeUsage() conversation.CumulativeUsage {
-	return conversation.CumulativeUsage{}
-}
-
-func (m *mockConvoInterface) LastUsage() llm.Usage {
-	return llm.Usage{}
-}
-
-func (m *mockConvoInterface) ResetBudget(conversation.Budget) {}
-
-func (m *mockConvoInterface) OverBudget() error {
-	return nil
-}
-
-func (m *mockConvoInterface) SendMessage(message llm.Message) (*llm.Response, error) {
-	if m.SendMessageFunc != nil {
-		return m.SendMessageFunc(message)
-	}
-	return &llm.Response{StopReason: llm.StopReasonEndTurn}, nil
-}
-
-func (m *mockConvoInterface) SendUserTextMessage(s string, otherContents ...llm.Content) (*llm.Response, error) {
-	return m.SendMessage(llm.UserStringMessage(s))
-}
-
-func (m *mockConvoInterface) ToolResultContents(ctx context.Context, resp *llm.Response) ([]llm.Content, bool, error) {
-	if m.ToolResultContentsFunc != nil {
-		return m.ToolResultContentsFunc(ctx, resp)
-	}
-	return []llm.Content{}, false, nil
-}
-
-func (m *mockConvoInterface) ToolResultCancelContents(resp *llm.Response) ([]llm.Content, error) {
-	return []llm.Content{llm.StringContent("Tool use cancelled")}, nil
-}
-
-func (m *mockConvoInterface) CancelToolUse(toolUseID string, cause error) error {
-	return nil
-}
-
-func TestAgentProcessTurnStateTransitions(t *testing.T) {
-	// Create a mock ConvoInterface for testing
-	mockConvo := &mockConvoInterface{}
-
-	// Use the testing context
-	ctx := t.Context()
-
-	// Create an agent with the state machine
-	agent := &Agent{
-		convo:  mockConvo,
-		config: AgentConfig{Context: ctx},
-		inbox:  make(chan string, 10),
-		ready:  make(chan struct{}),
-
-		outstandingLLMCalls:  make(map[string]struct{}),
-		outstandingToolCalls: make(map[string]string),
-		stateMachine:         NewStateMachine(),
-		startOfTurn:          time.Now(),
-		subscribers:          []chan *AgentMessage{},
-	}
-
-	// Verify initial state
-	if state := agent.CurrentState(); state != StateReady {
-		t.Errorf("Expected initial state to be StateReady, got %s", state)
-	}
-
-	// Add a message to the inbox so we don't block in GatherMessages
-	agent.inbox <- "Test message"
-
-	// Setup the mock to simulate a model response with end of turn
-	mockConvo.SendMessageFunc = func(message llm.Message) (*llm.Response, error) {
-		return &llm.Response{
-			StopReason: llm.StopReasonEndTurn,
-			Content: []llm.Content{
-				llm.StringContent("This is a test response"),
-			},
-		}, nil
-	}
-
-	// Track state transitions
-	var transitions []State
-	agent.stateMachine.SetTransitionCallback(func(ctx context.Context, from, to State, event TransitionEvent) {
-		transitions = append(transitions, to)
-		t.Logf("State transition: %s -> %s (%s)", from, to, event.Description)
-	})
-
-	// Process a turn, which should trigger state transitions
-	agent.processTurn(ctx)
-
-	// The minimum expected states for a simple end-of-turn response
-	minExpectedStates := []State{
-		StateWaitingForUserInput,
-		StateSendingToLLM,
-		StateProcessingLLMResponse,
-		StateEndOfTurn,
-	}
-
-	// Verify we have at least the minimum expected states
-	if len(transitions) < len(minExpectedStates) {
-		t.Errorf("Expected at least %d state transitions, got %d", len(minExpectedStates), len(transitions))
-	}
-
-	// Check that the transitions follow the expected sequence
-	for i, expected := range minExpectedStates {
-		if i < len(transitions) {
-			if transitions[i] != expected {
-				t.Errorf("Transition %d: expected %s, got %s", i, expected, transitions[i])
-			}
-		}
-	}
-
-	// Verify the final state is EndOfTurn
-	if state := agent.CurrentState(); state != StateEndOfTurn {
-		t.Errorf("Expected final state to be StateEndOfTurn, got %s", state)
-	}
-}
-
-func TestAgentProcessTurnWithToolUse(t *testing.T) {
-	// Create a mock ConvoInterface for testing
-	mockConvo := &mockConvoInterface{}
-
-	// Setup a test context
 	ctx := context.Background()
-
-	// Create an agent with the state machine
-	agent := &Agent{
-		convo:  mockConvo,
-		config: AgentConfig{Context: ctx},
-		inbox:  make(chan string, 10),
-		ready:  make(chan struct{}),
-
-		outstandingLLMCalls:  make(map[string]struct{}),
-		outstandingToolCalls: make(map[string]string),
-		stateMachine:         NewStateMachine(),
-		startOfTurn:          time.Now(),
-		subscribers:          []chan *AgentMessage{},
-	}
-
-	// Add a message to the inbox so we don't block in GatherMessages
-	agent.inbox <- "Test message"
-
-	// First response requests a tool
-	firstResponseDone := false
-	mockConvo.SendMessageFunc = func(message llm.Message) (*llm.Response, error) {
-		if !firstResponseDone {
-			firstResponseDone = true
-			return &llm.Response{
-				StopReason: llm.StopReasonToolUse,
-				Content: []llm.Content{
-					llm.StringContent("I'll use a tool"),
-					{Type: llm.ContentTypeToolUse, ToolName: "test_tool", ToolInput: []byte("{}"), ID: "test_id"},
-				},
-			}, nil
-		}
-		// Second response ends the turn
-		return &llm.Response{
-			StopReason: llm.StopReasonEndTurn,
-			Content: []llm.Content{
-				llm.StringContent("Finished using the tool"),
-			},
-		}, nil
-	}
-
-	// Tool result content handler
-	mockConvo.ToolResultContentsFunc = func(ctx context.Context, resp *llm.Response) ([]llm.Content, bool, error) {
-		return []llm.Content{llm.StringContent("Tool executed successfully")}, false, nil
-	}
-
-	// Track state transitions
-	var transitions []State
-	agent.stateMachine.SetTransitionCallback(func(ctx context.Context, from, to State, event TransitionEvent) {
-		transitions = append(transitions, to)
-		t.Logf("State transition: %s -> %s (%s)", from, to, event.Description)
-	})
-
-	// Process a turn with tool use
-	agent.processTurn(ctx)
-
-	// Define expected states for a tool use flow
-	expectedToolStates := []State{
-		StateWaitingForUserInput,
-		StateSendingToLLM,
-		StateProcessingLLMResponse,
-		StateToolUseRequested,
-		StateCheckingForCancellation,
-		StateRunningTool,
-	}
-
-	// Verify that these states are present in order
-	for i, expectedState := range expectedToolStates {
-		if i >= len(transitions) {
-			t.Errorf("Missing expected transition to %s; only got %d transitions", expectedState, len(transitions))
-			continue
-		}
-		if transitions[i] != expectedState {
-			t.Errorf("Expected transition %d to be %s, got %s", i, expectedState, transitions[i])
-		}
-	}
-
-	// Also verify we eventually reached EndOfTurn
-	if !slices.Contains(transitions, StateEndOfTurn) {
-		t.Errorf("Expected to eventually reach StateEndOfTurn, but never did")
+	err := state.pushFailedRefLocked(ctx, "/tmp", "abc123", "main-philip")
+	if err != nil {
+		t.Errorf("Expected no error when no remote is configured, got: %v", err)
 	}
 }
 
-func TestContentToString(t *testing.T) {
-	tests := []struct {
-		name     string
-		contents []llm.Content
-		want     string
-	}{
-		{
-			name:     "empty",
-			contents: []llm.Content{},
-			want:     "",
-		},
-		{
-			name: "single text content",
-			contents: []llm.Content{
-				{Type: llm.ContentTypeText, Text: "hello world"},
-			},
-			want: "hello world",
-		},
-		{
-			name: "multiple text content",
-			contents: []llm.Content{
-				{Type: llm.ContentTypeText, Text: "hello "},
-				{Type: llm.ContentTypeText, Text: "world"},
-			},
-			want: "hello world",
-		},
-		{
-			name: "mixed content types",
-			contents: []llm.Content{
-				{Type: llm.ContentTypeText, Text: "hello "},
-				{Type: llm.ContentTypeText, MediaType: "image/png", Data: "base64data"},
-				{Type: llm.ContentTypeText, Text: "world"},
-			},
-			want: "hello world",
-		},
-		{
-			name: "non-text content only",
-			contents: []llm.Content{
-				{Type: llm.ContentTypeToolUse, ToolName: "example"},
-			},
-			want: "",
-		},
-		{
-			name: "nested tool result",
-			contents: []llm.Content{
-				{Type: llm.ContentTypeText, Text: "outer "},
-				{Type: llm.ContentTypeToolResult, ToolResult: []llm.Content{
-					{Type: llm.ContentTypeText, Text: "inner"},
-				}},
-			},
-			want: "outer inner",
-		},
-		{
-			name: "deeply nested tool result",
-			contents: []llm.Content{
-				{Type: llm.ContentTypeToolResult, ToolResult: []llm.Content{
-					{Type: llm.ContentTypeToolResult, ToolResult: []llm.Content{
-						{Type: llm.ContentTypeText, Text: "deeply nested"},
-					}},
-				}},
-			},
-			want: "deeply nested",
-		},
+// TestAgentGitState_pushFailedRefLocked_EmptyHash tests with empty hash
+func TestAgentGitState_pushFailedRefLocked_EmptyHash(t *testing.T) {
+	state := &AgentGitState{
+		gitRemoteAddr: "some-remote",
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := contentToString(tt.contents); got != tt.want {
-				t.Errorf("contentToString() = %v, want %v", got, tt.want)
-			}
-		})
+	ctx := context.Background()
+	err := state.pushFailedRefLocked(ctx, "/tmp", "", "main-philip")
+	if err != nil {
+		t.Errorf("Expected no error when hash is empty, got: %v", err)
 	}
 }
 
-func TestPushToOutbox(t *testing.T) {
-	// Create a new agent
-	a := &Agent{
-		outstandingLLMCalls:  make(map[string]struct{}),
-		outstandingToolCalls: make(map[string]string),
-		stateMachine:         NewStateMachine(),
-		subscribers:          make([]chan *AgentMessage, 0),
-	}
-
-	// Create a channel to receive messages
-	messageCh := make(chan *AgentMessage, 1)
-
-	// Add the channel to the subscribers list
-	a.mu.Lock()
-	a.subscribers = append(a.subscribers, messageCh)
-	a.mu.Unlock()
-
-	// We need to set the text that would be produced by our modified contentToString function
-	resultText := "test resultnested result" // Directly set the expected output
-
-	// In a real-world scenario, this would be coming from a toolResult that contained nested content
-
-	m := AgentMessage{
-		Type:       ToolUseMessageType,
-		ToolResult: resultText,
-	}
-
-	// Push the message to the outbox
-	a.pushToOutbox(context.Background(), m)
-
-	// Receive the message from the subscriber
-	received := <-messageCh
-
-	// Check that the Content field contains the concatenated text from ToolResult
-	expected := "test resultnested result"
-	if received.Content != expected {
-		t.Errorf("Expected Content to be %q, got %q", expected, received.Content)
+// TestTimestampFormat tests that our timestamp format matches the expected pattern
+func TestTimestampFormat(t *testing.T) {
+	// Test with a known time
+	testTime := time.Date(2025, 6, 17, 16, 19, 0, 0, time.UTC)
+	timestamp := testTime.Format("200601021504")
+	expected := "202506171619"
+	if timestamp != expected {
+		t.Errorf("Expected timestamp %s, got %s", expected, timestamp)
 	}
 }

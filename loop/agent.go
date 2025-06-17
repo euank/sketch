@@ -2009,6 +2009,10 @@ func (ags *AgentGitState) handleGitCommits(ctx context.Context, sessionID string
 		}
 
 		if err != nil {
+			// Push the failed hash to a special ref for user access
+			if failedRefErr := ags.pushFailedRefLocked(ctx, repoRoot, sketch, originalBranchName); failedRefErr != nil {
+				slog.WarnContext(ctx, "Failed to push failed ref", "error", failedRefErr)
+			}
 			msgs = append(msgs, errorMessage(fmt.Errorf("git push to host: %s: %v", out, err)))
 		} else {
 			finalBranch := ags.branchNameLocked(branchPrefix)
@@ -2148,6 +2152,35 @@ func isValidGitSHA(sha string) bool {
 }
 
 // computeDiffStats computes the number of lines added and removed from baseRef to HEAD
+// pushFailedRefLocked pushes a failed hash to a special ref for user access
+// Format: refs/queue/queue-{original-branch}-{timestamp}
+// Must be called with ags.mu held
+func (ags *AgentGitState) pushFailedRefLocked(ctx context.Context, repoRoot, failedHash, originalBranch string) error {
+	if ags.gitRemoteAddr == "" || failedHash == "" || originalBranch == "" {
+		return nil // No remote or missing data, nothing to do
+	}
+
+	// Generate timestamp in format YYYYMMDDHHMI
+	now := time.Now()
+	timestamp := now.Format("200601021504") // Go's reference time in the required format
+
+	// Construct the special ref name
+	// Remove the branch prefix if it exists to get the "queue-main-philip" format
+	queueBranch := fmt.Sprintf("queue-%s-%s", originalBranch, timestamp)
+	specialRef := fmt.Sprintf("refs/queue/%s", queueBranch)
+
+	// Push the failed hash to the special ref
+	cmd := exec.CommandContext(ctx, "git", "push", ags.gitRemoteAddr, failedHash+":"+specialRef)
+	cmd.Dir = repoRoot
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to push failed ref %s: %s: %w", specialRef, out, err)
+	}
+
+	slog.InfoContext(ctx, "Pushed failed merge queue hash to special ref", "hash", failedHash[:8], "ref", specialRef)
+	return nil
+}
+
 func computeDiffStats(ctx context.Context, repoRoot, baseRef string) (int, int, error) {
 	cmd := exec.CommandContext(ctx, "git", "diff", "--numstat", baseRef, "HEAD")
 	cmd.Dir = repoRoot
