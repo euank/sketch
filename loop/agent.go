@@ -106,9 +106,6 @@ type CodingAgent interface {
 	// BranchName returns the git branch name for the conversation.
 	BranchName() string
 
-	// IncrementRetryNumber increments the retry number for branch naming conflicts.
-	IncrementRetryNumber()
-
 	// OS returns the operating system of the client.
 	OS() string
 
@@ -354,12 +351,6 @@ func (ags *AgentGitState) Slug() string {
 	ags.mu.Lock()
 	defer ags.mu.Unlock()
 	return ags.slug
-}
-
-func (ags *AgentGitState) IncrementRetryNumber() {
-	ags.mu.Lock()
-	defer ags.mu.Unlock()
-	ags.retryNumber++
 }
 
 func (ags *AgentGitState) DiffStats() (int, int) {
@@ -657,11 +648,6 @@ func (a *Agent) BranchName() string {
 // Slug returns the slug identifier for this conversation.
 func (a *Agent) Slug() string {
 	return a.gitState.Slug()
-}
-
-// IncrementRetryNumber increments the retry number for branch naming conflicts
-func (a *Agent) IncrementRetryNumber() {
-	a.gitState.IncrementRetryNumber()
 }
 
 // OutstandingLLMCallCount returns the number of outstanding LLM calls.

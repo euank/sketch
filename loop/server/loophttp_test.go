@@ -31,7 +31,6 @@ type mockAgent struct {
 	workingDir               string
 	sessionID                string
 	slug                     string
-	retryNumber              int
 	skabandAddr              string
 }
 
@@ -251,12 +250,6 @@ func (m *mockAgent) Slug() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.slug
-}
-
-func (m *mockAgent) IncrementRetryNumber() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.retryNumber++
 }
 
 func (m *mockAgent) GetPortMonitor() *loop.PortMonitor { return loop.NewPortMonitor() }
