@@ -35,7 +35,7 @@ export class DataManager {
   private loadedOldestMessageIndex: number = -1; // Track the oldest message we've loaded
   private hasMoreOlderMessages: boolean = true; // Whether there are more older messages to load
   private isLoadingOlderMessages: boolean = false; // Loading state
-  private readonly initialPageSize: number = 100; // Number of messages to load initially
+  private readonly initialPageSize: number = 10; // Number of messages to load initially
   private readonly pageSize: number = 50; // Number of messages to load per page
 
   // Event listeners
