@@ -359,6 +359,12 @@ func (ags *AgentGitState) Slug() string {
 func (ags *AgentGitState) IncrementRetryNumber() {
 	ags.mu.Lock()
 	defer ags.mu.Unlock()
+	ags.incrementRetryNumberLocked()
+}
+
+// incrementRetryNumberLocked increments the retry number without acquiring the mutex.
+// This method assumes the caller already holds the mutex.
+func (ags *AgentGitState) incrementRetryNumberLocked() {
 	ags.retryNumber++
 }
 
@@ -1988,7 +1994,7 @@ func (ags *AgentGitState) handleGitCommits(ctx context.Context, sessionID string
 		originalBranchName := ags.branchNameLocked(branchPrefix)
 		for retries := range 10 {
 			if retries > 0 {
-				ags.IncrementRetryNumber()
+				ags.incrementRetryNumberLocked()
 			}
 
 			branch := ags.branchNameLocked(branchPrefix)
