@@ -106,6 +106,25 @@ git reset --hard sketch/foo
 
 Ie use the same workflows you would if you were pulling in a friend's Pull Request.
 
+**Failed Push Recovery:**
+
+If a git push to your repository fails (due to network issues, permissions, or other problems), Sketch automatically saves the failed commit to a special reference that you can still access:
+
+```sh
+# Failed commits are saved to refs like:
+# refs/queue/queue-{branch}-{timestamp}
+# Example: refs/queue/queue-main-philip-202506171619
+
+# List all failed commit refs
+git ls-remote origin 'refs/queue/*'
+
+# Access a specific failed commit
+git fetch origin refs/queue/queue-main-philip-202506171619:failed-commit
+git checkout failed-commit
+```
+
+This ensures that even if the merge queue fails, your work is never lost and remains accessible for recovery.
+
 **Advanced:** You can ask Sketch to `git fetch sketch-host` and rebase onto another commit. This will also fetch where you started Sketch, and we do a bit of "git fetch refspec configuration" to make `origin/main` work as a git reference.
 
 Don't be afraid of asking Sketch to help you rebase, merge/squash commits, rewrite commit messages, and so forth; it's good at it!
