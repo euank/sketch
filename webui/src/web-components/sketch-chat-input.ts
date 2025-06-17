@@ -411,7 +411,7 @@ export class SketchChatInput extends LitElement {
         <div class="chat-input-wrapper">
           <textarea
             id="chatInput"
-            placeholder="Type your message here and press Enter to send..."
+            placeholder="Start a new session by writing an initial prompt here."
             autofocus
             @keydown="${this._chatInputKeyDown}"
             @input="${this._chatInputChanged}"
