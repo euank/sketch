@@ -75,14 +75,7 @@ export class MobileTitle extends LitElement {
       margin: 0;
     }
 
-    .slug-title {
-      margin: 2px 0 0 0;
-      padding: 0;
-      color: rgba(82, 82, 82, 0.85);
-      font-size: 13px;
-      font-weight: normal;
-      line-height: 1.2;
-    }
+
 
     .title a {
       color: inherit;
@@ -222,11 +215,10 @@ export class MobileTitle extends LitElement {
                   rel="noopener noreferrer"
                 >
                   <img src="${this.skabandAddr}/sketch.dev.png" alt="sketch" />
-                  Sketch
+                  ${this.slug || "Sketch"}
                 </a>`
-              : html`Sketch`}
+              : html`${this.slug || "Sketch"}`}
           </h1>
-          ${this.slug ? html`<h2 class="slug-title">${this.slug}</h2>` : ""}
         </div>
 
         <div class="right-section">

@@ -153,12 +153,19 @@ export class MobileDiff extends LitElement {
       // Get diff from base commit to untracked changes (empty string for working directory)
       this.files = await this.gitService.getDiff(this.baseCommit, "");
 
+      // Ensure files is always an array
+      if (!this.files) {
+        this.files = [];
+      }
+
       if (this.files.length > 0) {
         await this.loadAllFileContents();
       }
     } catch (error) {
       console.error("Error loading diff data:", error);
       this.error = `Error loading diff: ${error instanceof Error ? error.message : String(error)}`;
+      // Ensure files is always an array even on error
+      this.files = [];
     } finally {
       this.loading = false;
     }
@@ -401,7 +408,7 @@ export class MobileDiff extends LitElement {
           ? html`<div class="loading">Loading diff...</div>`
           : this.error 
           ? html`<div class="error">${this.error}</div>`
-          : this.files.length === 0
+          : !this.files || this.files.length === 0
           ? html`<div class="empty">No changes to show</div>`
           : this.files.map(file => this.renderFileDiff(file))}
       </div>
