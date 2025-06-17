@@ -69,7 +69,7 @@ export class DataManager {
    */
   private async loadInitialMessages(): Promise<void> {
     try {
-      const response = await fetch(`/messages/page?limit=${this.initialPageSize}`);
+      const response = await fetch(`messages/page?limit=${this.initialPageSize}`);
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
@@ -302,7 +302,7 @@ export class DataManager {
     
     try {
       const before = this.loadedOldestMessageIndex;
-      const response = await fetch(`/messages/page?limit=${this.pageSize}&before=${before}`);
+      const response = await fetch(`messages/page?limit=${this.pageSize}&before=${before}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
