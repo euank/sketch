@@ -170,6 +170,7 @@ export class MobileShell extends LitElement {
           .isThinking=${isThinking}
           .skabandAddr=${this.state?.skaband_addr}
           .currentView=${this.currentView}
+          .slug=${this.state?.slug || ""}
           @view-change=${this.handleViewChange}
         ></mobile-title>
 
