@@ -307,7 +307,16 @@ func executeBackgroundBash(ctx context.Context, req bashInput) (*BackgroundResul
 			// Only proceed if we timed out (not if parent context was cancelled)
 			if timeoutCtx.Err() == context.DeadlineExceeded {
 				// Log to stderr that we are killing the process
-				fmt.Fprintf(stderr, "sketch: killing process %d after timeout of %v\n", pid, timeout)
+				msg := fmt.Sprintf("sketch: killing process %d after timeout of %v\n", pid, timeout)
+
+				// Write to the stderr file by opening it directly to avoid any closure issues
+				if stderrFile, err := os.OpenFile(stderrFile, os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+					stderrFile.WriteString(msg)
+					stderrFile.Sync()
+					stderrFile.Close()
+				}
+
+				slog.WarnContext(ctx, "killing background process after timeout", "pid", pid, "timeout", timeout)
 
 				// First try SIGTERM to allow graceful shutdown
 				killErr := syscall.Kill(-pid, syscall.SIGTERM)
