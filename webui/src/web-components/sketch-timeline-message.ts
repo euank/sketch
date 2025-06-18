@@ -763,116 +763,101 @@ export class SketchTimelineMessage extends LitElement {
   updated(changedProperties: Map<string, unknown>) {
     super.updated(changedProperties);
     this.renderMermaidDiagrams();
-    this.setupCodeBlockCopyButtons();
   }
 
   // Render mermaid diagrams after the component is updated
-  renderMermaidDiagrams() {
-    // Add a small delay to ensure the DOM is fully rendered
-    setTimeout(async () => {
-      // Find all mermaid containers in our shadow root
-      const containers = this.shadowRoot?.querySelectorAll(".mermaid");
-      if (!containers || containers.length === 0) return;
+  async renderMermaidDiagrams() {
+    // Find all mermaid containers in our shadow root
+    const containers = this.shadowRoot?.querySelectorAll(".mermaid");
+    if (!containers || containers.length === 0) return;
 
-      try {
-        // Load mermaid dynamically
-        const mermaidLib = await loadMermaid();
+    try {
+      // Load mermaid dynamically
+      const mermaidLib = await loadMermaid();
 
-        // Initialize mermaid with specific config (only once per load)
-        mermaidLib.initialize({
-          startOnLoad: false,
-          suppressErrorRendering: true,
-          theme: "default",
-          securityLevel: "loose", // Allows more flexibility but be careful with user-generated content
-          fontFamily: "monospace",
-        });
+      // Initialize mermaid with specific config (only once per load)
+      mermaidLib.initialize({
+        startOnLoad: false,
+        suppressErrorRendering: true,
+        theme: "default",
+        securityLevel: "loose", // Allows more flexibility but be careful with user-generated content
+        fontFamily: "monospace",
+      });
 
-        // Process each mermaid diagram
-        containers.forEach((container) => {
-          const id = container.id;
-          const code = container.textContent || "";
-          if (!code || !id) return; // Use return for forEach instead of continue
+      // Process each mermaid diagram
+      containers.forEach((container) => {
+        const id = container.id;
+        const code = container.textContent || "";
+        if (!code || !id) return; // Use return for forEach instead of continue
 
-          try {
-            // Clear any previous content
-            container.innerHTML = code;
+        try {
+          // Clear any previous content
+          container.innerHTML = code;
 
-            // Render the mermaid diagram using promise
-            mermaidLib
-              .render(`${id}-svg`, code)
-              .then(({ svg }) => {
-                container.innerHTML = svg;
-              })
-              .catch((err) => {
-                console.error("Error rendering mermaid diagram:", err);
-                // Show the original code as fallback
-                container.innerHTML = `<pre>${code}</pre>`;
-              });
-          } catch (err) {
-            console.error("Error processing mermaid diagram:", err);
-            // Show the original code as fallback
-            container.innerHTML = `<pre>${code}</pre>`;
-          }
-        });
-      } catch (err) {
-        console.error("Error loading mermaid:", err);
-        // Show the original code as fallback for all diagrams
-        containers.forEach((container) => {
-          const code = container.textContent || "";
-          container.innerHTML = `<pre>${code}</pre>`;
-        });
-      }
-    }, 100); // Small delay to ensure DOM is ready
-  }
-
-  // Setup code block copy buttons after component is updated
-  setupCodeBlockCopyButtons() {
-    setTimeout(() => {
-      // Find all copy buttons in code blocks
-      const copyButtons =
-        this.shadowRoot?.querySelectorAll(".code-copy-button");
-      if (!copyButtons || copyButtons.length === 0) return;
-
-      // Add click event listener to each button
-      copyButtons.forEach((button) => {
-        button.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const codeId = (button as HTMLElement).dataset.codeId;
-          if (!codeId) return;
-
-          const codeElement = this.shadowRoot?.querySelector(`#${codeId}`);
-          if (!codeElement) return;
-
-          const codeText = codeElement.textContent || "";
-          const buttonRect = button.getBoundingClientRect();
-
-          // Copy code to clipboard
-          navigator.clipboard
-            .writeText(codeText)
-            .then(() => {
-              // Show success indicator
-              const originalHTML = button.innerHTML;
-              button.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 6L9 17l-5-5"></path>
-                </svg>
-              `;
-
-              // Display floating message
-              this.showFloatingMessage("Copied!", buttonRect, "success");
-
-              // Reset button after delay
-              setTimeout(() => {
-                button.innerHTML = originalHTML;
-              }, 2000);
+          // Render the mermaid diagram using promise
+          mermaidLib
+            .render(`${id}-svg`, code)
+            .then(({ svg }) => {
+              container.innerHTML = svg;
             })
             .catch((err) => {
-              console.error("Failed to copy code:", err);
-              this.showFloatingMessage("Failed to copy!", buttonRect, "error");
+              console.error("Error rendering mermaid diagram:", err);
+              // Show the original code as fallback
+              container.innerHTML = `<pre>${code}</pre>`;
             });
-        });
+        } catch (err) {
+          console.error("Error processing mermaid diagram:", err);
+          // Show the original code as fallback
+          container.innerHTML = `<pre>${code}</pre>`;
+        }
       });
-    }, 100); // Small delay to ensure DOM is ready
+    } catch (err) {
+      console.error("Error loading mermaid:", err);
+      // Show the original code as fallback for all diagrams
+      containers.forEach((container) => {
+        const code = container.textContent || "";
+        container.innerHTML = `<pre>${code}</pre>`;
+      });
+    }
+  }
+
+  // Handle code block copy button clicks via event delegation
+  handleCodeBlockCopy(event: Event) {
+    event.stopPropagation();
+    const button = event.target as HTMLElement;
+    const codeId = button.dataset.codeId;
+    if (!codeId) return;
+
+    const codeElement = this.shadowRoot?.querySelector(`#${codeId}`);
+    if (!codeElement) return;
+
+    const codeText = codeElement.textContent || "";
+    const buttonRect = button.getBoundingClientRect();
+
+    // Copy code to clipboard
+    navigator.clipboard
+      .writeText(codeText)
+      .then(() => {
+        // Show success indicator
+        const originalHTML = button.innerHTML;
+        button.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 6L9 17l-5-5"></path>
+          </svg>
+        `;
+
+        // Display floating message
+        this.showFloatingMessage("Copied!", buttonRect, "success");
+
+        // Reset button after delay
+        setTimeout(() => {
+          button.innerHTML = originalHTML;
+        }, 2000);
+      })
+      .catch((err) => {
+        console.error("Failed to copy code:", err);
+        this.showFloatingMessage("Failed to copy!", buttonRect, "error");
+      });
   }
 
   // See https://lit.dev/docs/components/lifecycle/
@@ -918,10 +903,10 @@ export class SketchTimelineMessage extends LitElement {
         return `<div class="code-block-container">
                  <div class="code-block-header">
                    ${lang ? `<span class="code-language">${lang}</span>` : ""}
-                   <button class="code-copy-button" title="Copy code" data-code-id="${id}">
+                   <button class="code-copy-button" title="Copy code" data-code-id="${id}" onclick="this.getRootNode().host.handleCodeBlockCopy(event)">
                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                      </svg>
                    </button>
                  </div>
