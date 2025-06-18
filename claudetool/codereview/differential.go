@@ -31,26 +31,58 @@ func (r *CodeReviewer) Tool() *llm.Tool {
 		Name:        "codereview",
 		Description: `Run an automated code review before presenting git commits to the user. Call if/when you've completed your current work and are ready for user feedback.`,
 		// If you modify this, update the termui template for prettier rendering.
-		InputSchema: llm.EmptySchema(),
-		Run:         r.Run,
+		InputSchema: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"timeout": {
+					"type": "string",
+					"description": "Timeout as a Go duration string (default: 1m)",
+					"default": "1m"
+				}
+			}
+		}`),
+		Run: r.Run,
 	}
 	return spec
 }
 
 func (r *CodeReviewer) Run(ctx context.Context, m json.RawMessage) ([]llm.Content, error) {
+	// Parse input to get timeout
+	var input struct {
+		Timeout string `json:"timeout"`
+	}
+	if len(m) > 0 {
+		if err := json.Unmarshal(m, &input); err != nil {
+			return nil, fmt.Errorf("failed to parse input: %w", err)
+		}
+	}
+	if input.Timeout == "" {
+		input.Timeout = "1m" // default timeout
+	}
+
+	// Parse timeout duration
+	timeout, err := time.ParseDuration(input.Timeout)
+	if err != nil {
+		return nil, fmt.Errorf("invalid timeout duration %q: %w", input.Timeout, err)
+	}
+
+	// Create timeout context
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	// NOTE: If you add or modify error messages here, update the corresponding UI parsing in:
 	// webui/src/web-components/sketch-tool-card.ts (SketchToolCardCodeReview.getStatusIcon)
-	if err := r.RequireNormalGitState(ctx); err != nil {
+	if err := r.RequireNormalGitState(timeoutCtx); err != nil {
 		slog.DebugContext(ctx, "CodeReviewer.Run: failed to check for normal git state", "err", err)
 		return nil, err
 	}
-	if err := r.RequireNoUncommittedChanges(ctx); err != nil {
+	if err := r.RequireNoUncommittedChanges(timeoutCtx); err != nil {
 		slog.DebugContext(ctx, "CodeReviewer.Run: failed to check for uncommitted changes", "err", err)
 		return nil, err
 	}
 
 	// Check that the current commit is not the initial commit
-	currentCommit, err := r.CurrentCommit(ctx)
+	currentCommit, err := r.CurrentCommit(timeoutCtx)
 	if err != nil {
 		slog.DebugContext(ctx, "CodeReviewer.Run: failed to get current commit", "err", err)
 		return nil, err
@@ -64,7 +96,7 @@ func (r *CodeReviewer) Run(ctx context.Context, m json.RawMessage) ([]llm.Conten
 	// This should help avoid the model getting blocked by a broken code review tool.
 	r.reviewed = append(r.reviewed, currentCommit)
 
-	changedFiles, err := r.changedFiles(ctx, r.sketchBaseRef, currentCommit)
+	changedFiles, err := r.changedFiles(timeoutCtx, r.sketchBaseRef, currentCommit)
 	if err != nil {
 		slog.DebugContext(ctx, "CodeReviewer.Run: failed to get changed files", "err", err)
 		return nil, err
@@ -75,7 +107,7 @@ func (r *CodeReviewer) Run(ctx context.Context, m json.RawMessage) ([]llm.Conten
 	// The packages in the initial commit may be different.
 	// Good enough for now.
 	// TODO: do better
-	allPkgs, err := r.packagesForFiles(ctx, changedFiles)
+	allPkgs, err := r.packagesForFiles(timeoutCtx, changedFiles)
 	if err != nil {
 		// TODO: log and skip to stuff that doesn't require packages
 		slog.DebugContext(ctx, "CodeReviewer.Run: failed to get packages for files", "err", err)
@@ -87,7 +119,7 @@ func (r *CodeReviewer) Run(ctx context.Context, m json.RawMessage) ([]llm.Conten
 	var infoMessages []string  // info the model should consider
 
 	// Run 'go generate' early, so that it can potentially fix tests that would otherwise fail.
-	generateChanges, err := r.runGenerate(ctx, allPkgList)
+	generateChanges, err := r.runGenerate(timeoutCtx, allPkgList)
 	if err != nil {
 		errorMessages = append(errorMessages, err.Error())
 	}
@@ -105,7 +137,7 @@ func (r *CodeReviewer) Run(ctx context.Context, m json.RawMessage) ([]llm.Conten
 	// Find potentially related files that should also be considered
 	// TODO: add some caching here, since this depends only on the initial commit and the changed files, not the details of the changes
 	// TODO: arrange for this to run even in non-Go repos!
-	relatedFiles, err := r.findRelatedFiles(ctx, changedFiles)
+	relatedFiles, err := r.findRelatedFiles(timeoutCtx, changedFiles)
 	if err != nil {
 		slog.DebugContext(ctx, "CodeReviewer.Run: failed to find related files", "err", err)
 	} else {
@@ -115,7 +147,7 @@ func (r *CodeReviewer) Run(ctx context.Context, m json.RawMessage) ([]llm.Conten
 		}
 	}
 
-	testMsg, err := r.checkTests(ctx, allPkgList)
+	testMsg, err := r.checkTests(timeoutCtx, allPkgList)
 	if err != nil {
 		slog.DebugContext(ctx, "CodeReviewer.Run: failed to check tests", "err", err)
 		return nil, err
@@ -124,7 +156,7 @@ func (r *CodeReviewer) Run(ctx context.Context, m json.RawMessage) ([]llm.Conten
 		errorMessages = append(errorMessages, testMsg)
 	}
 
-	goplsMsg, err := r.checkGopls(ctx, changedFiles) // includes vet checks
+	goplsMsg, err := r.checkGopls(timeoutCtx, changedFiles) // includes vet checks
 	if err != nil {
 		slog.DebugContext(ctx, "CodeReviewer.Run: failed to check gopls", "err", err)
 		return nil, err
