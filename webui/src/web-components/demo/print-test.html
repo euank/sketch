@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sketch Print Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 20px 0;
+        }
+        
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 6px;
+        }
+        
+        .user-message {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .agent-message {
+            background: #f3e5f5;
+            border-left: 4px solid #9c27b0;
+        }
+        
+        .print-button {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .print-button:hover {
+            background: #45a049;
+        }
+        
+        /* Print styles */
+        @media print {
+            body {
+                background: white !important;
+                padding: 0 !important;
+            }
+            
+            .container {
+                max-width: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+            }
+            
+            .chat-container {
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                border: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            
+            .print-button {
+                display: none !important;
+            }
+            
+            .message {
+                page-break-inside: avoid;
+                margin: 8px 0;
+            }
+            
+            h1, h2, h3 {
+                page-break-after: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sketch Print Test</h1>
+        <p>This page tests the print functionality for sketch chat. Use Ctrl+P (or Cmd+P on Mac) to print.</p>
+        
+        <button class="print-button" onclick="window.print()">Print Test</button>
+        
+        <div class="chat-container">
+            <div class="message user-message">
+                <strong>User:</strong> Hello, can you help me with some code?
+            </div>
+            
+            <div class="message agent-message">
+                <strong>Agent:</strong> Of course! I'd be happy to help you with your code. What specific programming language or problem are you working on?
+            </div>
+            
+            <div class="message user-message">
+                <strong>User:</strong> I need to fix a CSS issue with printing. The content gets cut off when printing.
+            </div>
+            
+            <div class="message agent-message">
+                <strong>Agent:</strong> That's a common issue with web applications. The problem usually occurs when:
+                <ul>
+                    <li>Container elements have fixed heights</li>
+                    <li>Overflow properties are set to 'auto' or 'hidden'</li>
+                    <li>Flexbox layouts don't expand properly for print</li>
+                </ul>
+                
+                <p>Here's how to fix it:</p>
+                
+                <pre><code>@media print {
+  .container {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  
+  .scrollable-content {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}</code></pre>
+            </div>
+            
+            <div class="message user-message">
+                <strong>User:</strong> That makes sense! Should I also hide interactive elements during print?
+            </div>
+            
+            <div class="message agent-message">
+                <strong>Agent:</strong> Absolutely! Interactive elements like buttons, form inputs, and navigation menus should typically be hidden during print since they're not functional on paper. You can do this with:
+                
+                <pre><code>@media print {
+  .button, .interactive-element {
+    display: none !important;
+  }
+}</code></pre>
+                
+                <p>Also consider:</p>
+                <ul>
+                    <li>Use <code>page-break-inside: avoid</code> on important content blocks</li>
+                    <li>Remove shadows, borders, and background colors that waste ink</li>
+                    <li>Ensure text is black on white for better readability</li>
+                    <li>Adjust margins and padding for better paper layout</li>
+                </ul>
+            </div>
+            
+            <div class="message user-message">
+                <strong>User:</strong> Perfect! This should solve my printing issues. Thank you!
+            </div>
+            
+            <div class="message agent-message">
+                <strong>Agent:</strong> You're welcome! The key is to remember that print styles should make content flow naturally on paper rather than being constrained by screen dimensions. Always test your print styles by using your browser's print preview feature.
+            </div>
+        </div>
+        
+        <p><strong>Instructions:</strong> Click the "Print Test" button or use Ctrl+P to test the print functionality. The chat should print across multiple pages if needed, with proper page breaks.</p>
+    </div>
+</body>
+</html>

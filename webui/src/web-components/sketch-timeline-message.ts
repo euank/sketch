@@ -744,6 +744,56 @@ export class SketchTimelineMessage extends LitElement {
     .mermaid {
       text-align: center;
     }
+
+    /* Print styles for message components */
+    @media print {
+      .message {
+        page-break-inside: avoid;
+        margin-bottom: 12px;
+      }
+
+      .message-container {
+        page-break-inside: avoid;
+      }
+
+      /* Hide copy buttons and interactive elements during printing */
+      .copy-icon,
+      .info-icon,
+      .commit-diff-button {
+        display: none !important;
+      }
+
+      /* Ensure code blocks print properly */
+      .message-content pre {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        page-break-inside: avoid;
+        background: #f8f8f8 !important;
+        border: 1px solid #ddd !important;
+        padding: 8px !important;
+      }
+
+      /* Ensure tool calls section prints properly */
+      .tool-calls-section {
+        page-break-inside: avoid;
+      }
+
+      /* Simplify message metadata for print */
+      .message-metadata-left {
+        font-size: 10px;
+      }
+
+      /* Ensure content doesn't break poorly */
+      .message-content {
+        orphans: 3;
+        widows: 3;
+      }
+
+      /* Hide floating messages during print */
+      .floating-message {
+        display: none !important;
+      }
+    }
   `;
 
   // Track mermaid diagrams that need rendering

@@ -466,6 +466,84 @@ export class SketchAppShell extends LitElement {
       transform: rotate(45deg);
       transform-origin: center center;
     }
+
+    /* Print styles for full chat printing */
+    @media print {
+      :host {
+        height: auto !important;
+        overflow: visible !important;
+        display: block !important;
+      }
+
+      /* Hide non-essential UI elements during printing */
+      #top-banner {
+        border-bottom: 1px solid #000;
+        box-shadow: none;
+        page-break-inside: avoid;
+      }
+
+      /* Hide interactive elements that aren't useful in print */
+      .stop-button,
+      .end-button,
+      .notifications-toggle,
+      sketch-call-status,
+      sketch-network-status,
+      sketch-view-mode-select {
+        display: none !important;
+      }
+
+      /* Ensure view container can expand to full content */
+      #view-container {
+        overflow: visible !important;
+        flex: none !important;
+        height: auto !important;
+        max-height: none !important;
+      }
+
+      #view-container-inner {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+
+      /* Remove todo panel from print to avoid layout issues */
+      .todo-panel-container {
+        display: none !important;
+      }
+
+      /* Ensure chat timeline container takes full width in print */
+      .chat-timeline-container {
+        margin-right: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+
+      /* Make chat view fully visible */
+      .chat-view {
+        height: auto !important;
+        overflow: visible !important;
+      }
+
+      /* Hide chat input during printing */
+      #chat-input {
+        display: none !important;
+      }
+
+      /* Adjust diff2 and terminal views for print */
+      .diff2-view,
+      .terminal-view {
+        height: auto !important;
+        overflow: visible !important;
+      }
+
+      /* Ensure only active view is shown in print */
+      .chat-view:not(.view-active),
+      .diff2-view:not(.view-active),
+      .terminal-view:not(.view-active) {
+        display: none !important;
+      }
+    }
   `;
 
   // Header bar: Network connection status details

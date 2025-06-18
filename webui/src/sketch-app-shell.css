@@ -20,3 +20,17 @@ body {
   src: url("./monaco/min/vs/base/browser/ui/codicons/codicon/codicon.ttf")
     format("truetype");
 }
+
+/* Print styles for full chat printing */
+@media print {
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+  }
+}

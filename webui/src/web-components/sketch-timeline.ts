@@ -259,8 +259,51 @@ export class SketchTimeline extends LitElement {
         transform: rotate(360deg);
       }
     }
-  `;
 
+    /* Print styles for full timeline printing */
+    @media print {
+      .timeline-container {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        page-break-inside: avoid;
+      }
+
+      .timeline {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+
+      #scroll-container {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        overflow-y: visible !important;
+        overflow-x: visible !important;
+      }
+
+      /* Hide the jump to latest button during printing */
+      #jump-to-latest {
+        display: none !important;
+      }
+
+      /* Hide the thinking indicator during printing */
+      .thinking-indicator {
+        display: none !important;
+      }
+
+      /* Hide the loading indicator during printing */
+      .loading-indicator {
+        display: none !important;
+      }
+
+      /* Ensure welcome box prints properly if visible */
+      .welcome-box {
+        page-break-inside: avoid;
+      }
+    }
+  `;
   constructor() {
     super();
 
