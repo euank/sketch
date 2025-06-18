@@ -299,19 +299,34 @@ func executeBackgroundBash(ctx context.Context, req bashInput) (*BackgroundResul
 	timeout := req.timeout()
 	if timeout > 0 {
 		// Launch a goroutine that will kill the process after the timeout
+		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, timeout)
 		go func() {
-			// TODO(josh): this should use a context instead of a sleep, like executeBash above,
-			// to avoid goroutine leaks. Possibly should be partially unified with executeBash.
-			// Sleep for the timeout duration
-			time.Sleep(timeout)
+			defer timeoutCancel()
+			<-timeoutCtx.Done()
 
-			// TODO(philip): Should we do SIGQUIT and then SIGKILL in 5s?
+			// Only proceed if we timed out (not if parent context was cancelled)
+			if timeoutCtx.Err() == context.DeadlineExceeded {
+				// Log to stderr that we are killing the process
+				fmt.Fprintf(stderr, "sketch: killing process %d after timeout of %v\n", pid, timeout)
 
-			// Try to kill the process group
-			killErr := syscall.Kill(-pid, syscall.SIGKILL)
-			if killErr != nil {
-				// If killing the process group fails, try to kill just the process
-				syscall.Kill(pid, syscall.SIGKILL)
+				// First try SIGTERM to allow graceful shutdown
+				killErr := syscall.Kill(-pid, syscall.SIGTERM)
+				if killErr != nil {
+					// If killing the process group fails, try to kill just the process
+					syscall.Kill(pid, syscall.SIGTERM)
+				}
+
+				// Give the process 5 seconds to shut down gracefully
+				graceCtx, graceCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer graceCancel()
+				<-graceCtx.Done()
+
+				// If the process is still running, use SIGKILL
+				killErr = syscall.Kill(-pid, syscall.SIGKILL)
+				if killErr != nil {
+					// If killing the process group fails, try to kill just the process
+					syscall.Kill(pid, syscall.SIGKILL)
+				}
 			}
 		}()
 	}
