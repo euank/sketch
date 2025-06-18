@@ -1,6 +1,7 @@
 import { css, html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { createRef, Ref, ref } from "lit/directives/ref.js";
+import { ThemeManager, Theme } from "../theme";
 
 // See https://rodydavis.com/posts/lit-monaco-editor for some ideas.
 
@@ -145,6 +146,12 @@ export class CodeDiffEditor extends LitElement {
   // Save state properties
   @state() private saveState: "idle" | "modified" | "saving" | "saved" = "idle";
   @state() private debounceSaveTimeout: number | null = null;
+  
+  // Theme state
+  @state()
+  private currentTheme: Theme = 'light';
+  
+  private themeManager = ThemeManager.getInstance();
   @state() private lastSavedContent: string = "";
   @property() originalCode?: string = "// Original code here";
   @property() modifiedCode?: string = "// Modified code here";
@@ -704,10 +711,11 @@ export class CodeDiffEditor extends LitElement {
       // First time initialization
       if (!this.editor) {
         // Create the diff editor with auto-sizing configuration
+        const monacoTheme = this.currentTheme === 'dark' ? 'vs-dark' : 'vs';
         this.editor = monaco.editor.createDiffEditor(this.container.value!, {
           automaticLayout: false, // We'll resize manually
           readOnly: true,
-          theme: "vs", // Always use light mode
+          theme: monacoTheme,
           renderSideBySide: !this.inline,
           ignoreTrimWhitespace: false,
           renderOverviewRuler: false, // Disable the overview ruler
@@ -1311,6 +1319,10 @@ export class CodeDiffEditor extends LitElement {
 
   // Add resize observer to ensure editor resizes when container changes
   async firstUpdated() {
+    // Set up theme listener
+    this.currentTheme = this.themeManager.getCurrentTheme();
+    this.themeManager.addListener(this.handleThemeChange.bind(this));
+    
     // Initialize the editor
     await this.initializeEditor();
 
@@ -1379,8 +1391,19 @@ export class CodeDiffEditor extends LitElement {
     }
   }
 
+  private handleThemeChange(theme: Theme) {
+    this.currentTheme = theme;
+    if (this.editor && window.monaco) {
+      const monacoTheme = theme === 'dark' ? 'vs-dark' : 'vs';
+      window.monaco.editor.setTheme(monacoTheme);
+    }
+  }
+  
   disconnectedCallback() {
     super.disconnectedCallback();
+    
+    // Remove theme listener
+    this.themeManager.removeListener(this.handleThemeChange.bind(this));
 
     try {
       // Remove editor from debug global before disposal

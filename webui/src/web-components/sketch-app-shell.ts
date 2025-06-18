@@ -2,6 +2,7 @@ import { css, html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { ConnectionStatus, DataManager } from "../data";
 import { AgentMessage, GitLogEntry, State } from "../types";
+import "../theme"; // Initialize theme system
 import { aggregateAgentMessages } from "./aggregateAgentMessages";
 
 import "./sketch-chat-input";
@@ -1244,6 +1245,8 @@ export class SketchAppShell extends LitElement {
           .diffLinesAdded=${this.containerState?.diff_lines_added || 0}
           .diffLinesRemoved=${this.containerState?.diff_lines_removed || 0}
         ></sketch-view-mode-select>
+
+        <sketch-theme-toggle></sketch-theme-toggle>
 
         <div class="refresh-control">
           <button

@@ -99,7 +99,7 @@ export class SketchTimelineMessage extends LitElement {
       padding: 3px 5px;
       text-align: right;
       font-size: 11px;
-      color: #777;
+      color: var(--text-tertiary);
       align-self: flex-start;
     }
 
@@ -108,7 +108,7 @@ export class SketchTimelineMessage extends LitElement {
       padding: 3px 5px;
       text-align: left;
       font-size: 11px;
-      color: #777;
+      color: var(--text-tertiary);
       align-self: flex-start;
     }
 
@@ -144,8 +144,8 @@ export class SketchTimelineMessage extends LitElement {
 
     /* User message styling */
     .user .message-content {
-      background-color: #2196f3;
-      color: white;
+      background-color: var(--accent-primary);
+      color: var(--text-inverse);
       border-bottom-right-radius: 5px;
     }
 
@@ -153,8 +153,8 @@ export class SketchTimelineMessage extends LitElement {
     .agent .message-content,
     .tool .message-content,
     .error .message-content {
-      background-color: #f1f1f1;
-      color: black;
+      background-color: var(--bg-secondary);
+      color: var(--text-primary);
       border-bottom-left-radius: 5px;
     }
 
@@ -187,7 +187,7 @@ export class SketchTimelineMessage extends LitElement {
     .info-icon {
       background-color: transparent;
       border: none;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--text-secondary);
       cursor: pointer;
       padding: 3px;
       border-radius: 50%;
@@ -416,7 +416,7 @@ export class SketchTimelineMessage extends LitElement {
 
     /* Custom styles for IRC-like experience */
     .user .message-content {
-      border-left-color: #2196f3;
+      border-left-color: var(--accent-primary);
     }
 
     .agent .message-content {

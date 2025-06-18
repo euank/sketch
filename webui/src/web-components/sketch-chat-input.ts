@@ -23,7 +23,7 @@ export class SketchChatInput extends LitElement {
     /* Chat styles - exactly matching timeline.css */
     .chat-container {
       width: 100%;
-      background: #f0f0f0;
+      background: var(--bg-secondary);
       padding: 15px;
       min-height: 40px; /* Ensure minimum height */
       position: relative;
@@ -39,22 +39,22 @@ export class SketchChatInput extends LitElement {
     #chatInput {
       flex: 1;
       padding: 12px;
-      border: 1px solid #ddd;
+      border: 1px solid var(--border-primary);
       border-radius: 4px;
       resize: vertical;
       font-family: monospace;
       font-size: 12px;
       min-height: 40px;
       max-height: 300px;
-      background: #f7f7f7;
+      background: var(--bg-tertiary);
       overflow-y: auto;
       box-sizing: border-box; /* Ensure padding is included in height calculation */
       line-height: 1.4; /* Consistent line height for better height calculation */
     }
 
     #sendChatButton {
-      background-color: #2196f3;
-      color: white;
+      background-color: var(--accent-primary);
+      color: var(--text-inverse);
       border: none;
       border-radius: 4px;
       padding: 0 20px;
@@ -65,11 +65,11 @@ export class SketchChatInput extends LitElement {
     }
 
     #sendChatButton:hover {
-      background-color: #0d8bf2;
+      background-color: var(--accent-hover);
     }
 
     #sendChatButton:disabled {
-      background-color: #b0b0b0;
+      background-color: var(--accent-disabled);
       cursor: not-allowed;
     }
 
@@ -80,8 +80,8 @@ export class SketchChatInput extends LitElement {
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: rgba(33, 150, 243, 0.1);
-      border: 2px dashed #2196f3;
+      background-color: var(--info-bg);
+      border: 2px dashed var(--accent-primary);
       border-radius: 4px;
       display: flex;
       justify-content: center;

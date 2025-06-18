@@ -83,8 +83,8 @@ export class SketchTimeline extends LitElement {
       position: absolute;
       bottom: 20px;
       right: 20px;
-      background: rgb(33, 150, 243);
-      color: white;
+      background: var(--accent-primary);
+      color: var(--text-inverse);
       border-radius: 8px;
       padding: 0.5em;
       margin: 0.5em;
@@ -106,10 +106,10 @@ export class SketchTimeline extends LitElement {
       max-width: 90%;
       width: 90%;
       padding: 2rem;
-      border: 2px solid #e0e0e0;
+      border: 2px solid var(--border-primary);
       border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-      background-color: #ffffff;
+      box-shadow: var(--shadow-md);
+      background-color: var(--bg-secondary);
       text-align: center;
     }
 
@@ -118,11 +118,11 @@ export class SketchTimeline extends LitElement {
       font-weight: 600;
       margin-bottom: 1.5rem;
       text-align: center;
-      color: #333;
+      color: var(--text-primary);
     }
 
     .welcome-box-content {
-      color: #666; /* Slightly grey font color */
+      color: var(--text-secondary);
       line-height: 1.6;
       font-size: 1rem;
       text-align: left;
