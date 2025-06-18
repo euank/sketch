@@ -21,6 +21,19 @@ body {
   min-height: -webkit-fill-available;
 }
 
+/* 
+ * Import Monaco editor's Codicon font - this is critical for icons
+ * IMPORTANT: This font-face declaration MUST remain in global CSS.
+ * Chrome does not apply @font-face rules properly when they're inside shadow DOM.
+ * Do not move this to the sketch-monaco-view component despite it being used there.
+ */
+@font-face {
+  font-family: "codicon";
+  font-display: block;
+  src: url("./monaco/min/vs/base/browser/ui/codicons/codicon/codicon.ttf")
+    format("truetype");
+}
+
 /* Mobile viewport optimizations */
 @media screen and (max-width: 768px) {
   html {
