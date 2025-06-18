@@ -218,6 +218,7 @@ type CLIFlags struct {
 	branchPrefix        string
 	sshConnectionString string
 	subtraceToken       string
+	mcpServers          StringSliceFlag
 }
 
 // parseCLIFlags parses all command-line flags and returns a CLIFlags struct
@@ -250,6 +251,7 @@ func parseCLIFlags() CLIFlags {
 	userFlags.Var(&flags.mounts, "mount", "volume to mount in the container in format /path/on/host:/path/in/container (can be repeated)")
 	userFlags.BoolVar(&flags.termUI, "termui", true, "enable terminal UI")
 	userFlags.StringVar(&flags.branchPrefix, "branch-prefix", "sketch/", "prefix for git branches created by sketch")
+	userFlags.Var(&flags.mcpServers, "mcp", "MCP server to connect to (can be repeated)")
 
 	// Internal flags (for sketch developers or internal use)
 	// Args to sketch innie:
@@ -340,6 +342,8 @@ func parseCLIFlags() CLIFlags {
 	}
 
 	return flags
+
+	return flags
 }
 
 // runInHostMode handles execution on the host machine, which typically involves
@@ -419,6 +423,7 @@ func runInHostMode(ctx context.Context, flags CLIFlags) error {
 		BranchPrefix:   flags.branchPrefix,
 		LinkToGitHub:   flags.linkToGitHub,
 		SubtraceToken:  flags.subtraceToken,
+		MCPServers:     flags.mcpServers,
 	}
 
 	if err := dockerimg.LaunchContainer(ctx, config); err != nil {
@@ -538,6 +543,7 @@ func setupAndRunAgent(ctx context.Context, flags CLIFlags, modelURL, apiKey, pub
 		BranchPrefix:        flags.branchPrefix,
 		LinkToGitHub:        flags.linkToGitHub,
 		SSHConnectionString: flags.sshConnectionString,
+		MCPServers:          flags.mcpServers,
 	}
 
 	// Create SkabandClient if skaband address is provided

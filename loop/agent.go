@@ -425,6 +425,8 @@ type Agent struct {
 	outsideWorkingDir string
 	// URL of the git remote 'origin' if it exists
 	gitOrigin string
+	// MCP client for connecting to MCP servers
+	mcpClient *MCPClient
 
 	// Time when the current turn started (reset at the beginning of InnerLoop)
 	startOfTurn time.Time
@@ -1025,6 +1027,8 @@ type AgentConfig struct {
 	SSHConnectionString string
 	// Skaband client for session history (optional)
 	SkabandClient *skabandclient.SkabandClient
+	// MCP servers to connect to
+	MCPServers []string
 }
 
 // NewAgent creates a new Agent.
@@ -1056,6 +1060,7 @@ func NewAgent(config AgentConfig) *Agent {
 		workingDir:           config.WorkingDir,
 		outsideHTTP:          config.OutsideHTTP,
 		portMonitor:          NewPortMonitor(),
+		mcpClient:            NewMCPClient(),
 	}
 	return agent
 }
@@ -1193,6 +1198,16 @@ func (a *Agent) Init(ini AgentInit) error {
 
 	}
 	a.gitState.lastSketch = a.SketchGitBase()
+
+	// Connect to MCP servers if specified
+	if len(a.config.MCPServers) > 0 {
+		slog.InfoContext(ctx, "Connecting to MCP servers", "servers", a.config.MCPServers)
+		if err := a.mcpClient.ConnectToServers(ctx, a.config.MCPServers); err != nil {
+			slog.WarnContext(ctx, "Failed to connect to some MCP servers", "error", err)
+			// Don't fail initialization if MCP connections fail
+		}
+	}
+
 	a.convo = a.initConvo()
 	close(a.ready)
 	return nil
@@ -1243,6 +1258,12 @@ func (a *Agent) initConvo() *conversation.Convo {
 	go func() {
 		<-a.config.Context.Done()
 		browserCleanup()
+		// Also cleanup MCP client
+		if a.mcpClient != nil {
+			if err := a.mcpClient.Close(); err != nil {
+				slog.Warn("Failed to close MCP client", "error", err)
+			}
+		}
 	}()
 	browserTools = bTools
 
@@ -1263,6 +1284,15 @@ func (a *Agent) initConvo() *conversation.Convo {
 	if a.config.SkabandClient != nil {
 		sessionHistoryTools := claudetool.CreateSessionHistoryTools(a.config.SkabandClient, a.config.SessionID, a.gitOrigin)
 		convo.Tools = append(convo.Tools, sessionHistoryTools...)
+	}
+
+	// Add MCP tools if available
+	if a.mcpClient != nil {
+		mcpTools := a.mcpClient.GetAllTools()
+		if len(mcpTools) > 0 {
+			slog.InfoContext(a.config.Context, "Adding MCP tools to conversation", "count", len(mcpTools))
+			convo.Tools = append(convo.Tools, mcpTools...)
+		}
 	}
 
 	convo.Listener = a

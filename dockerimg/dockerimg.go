@@ -127,6 +127,9 @@ type ContainerConfig struct {
 
 	// SubtraceToken enables running sketch under subtrace.dev (development only)
 	SubtraceToken string
+
+	// MCPServers is a list of MCP servers to connect to
+	MCPServers []string
 }
 
 // LaunchContainer creates a docker container for a project, installs sketch and opens a connection to it.
@@ -621,6 +624,11 @@ func createDockerContainer(ctx context.Context, cntrName, hostPort, relPath, img
 		// TODO: have outtie run an http proxy?
 		// TODO: select and forward the relevant API key based on the model
 		cmdArgs = append(cmdArgs, "-llm-api-key="+os.Getenv("ANTHROPIC_API_KEY"))
+	}
+
+	// Add MCP servers
+	for _, mcpServer := range config.MCPServers {
+		cmdArgs = append(cmdArgs, "-mcp", mcpServer)
 	}
 
 	// Add additional docker arguments if provided
