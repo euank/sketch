@@ -488,6 +488,10 @@ export class SketchAppShell extends LitElement {
   @state()
   private _todoPanelVisible: boolean = false;
 
+  // Store scroll position for the chat view to preserve it when switching tabs
+  @state()
+  private _chatScrollPosition: number = 0;
+
   // ResizeObserver for tracking chat input height changes
   private chatInputResizeObserver: ResizeObserver | null = null;
 
@@ -754,6 +758,19 @@ export class SketchAppShell extends LitElement {
     // Don't do anything if the mode is already active
     if (this.viewMode === mode) return;
 
+    // Store scroll position if we're leaving the chat view
+    if (this.viewMode === "chat" && this.scrollContainerRef.value) {
+      // Only store scroll position if we actually have meaningful content
+      const scrollTop = this.scrollContainerRef.value.scrollTop;
+      const scrollHeight = this.scrollContainerRef.value.scrollHeight;
+      const clientHeight = this.scrollContainerRef.value.clientHeight;
+      
+      // Store position only if we have scrollable content and have actually scrolled
+      if (scrollHeight > clientHeight && scrollTop > 0) {
+        this._chatScrollPosition = scrollTop;
+      }
+    }
+
     // Update the view mode
     this.viewMode = mode;
 
@@ -788,6 +805,18 @@ export class SketchAppShell extends LitElement {
       switch (mode) {
         case "chat":
           chatView?.classList.add("view-active");
+          // Restore scroll position if we're switching back to chat
+          if (this.scrollContainerRef.value && this._chatScrollPosition > 0) {
+            // Use requestAnimationFrame to ensure DOM is ready
+            requestAnimationFrame(() => {
+              if (this.scrollContainerRef.value) {
+                // Double-check that we're still in chat mode and the container is available
+                if (this.viewMode === "chat" && this.scrollContainerRef.value.isConnected) {
+                  this.scrollContainerRef.value.scrollTop = this._chatScrollPosition;
+                }
+              }
+            });
+          }
           break;
 
         case "diff2":
@@ -997,7 +1026,24 @@ export class SketchAppShell extends LitElement {
     }
 
     // Update messages
+    const oldMessageCount = this.messages.length;
     this.messages = aggregateAgentMessages(this.messages, newMessages);
+    
+    // If new messages were added and we're in chat view, reset stored scroll position
+    // so the timeline can auto-scroll to bottom for new content
+    if (this.messages.length > oldMessageCount && this.viewMode === "chat") {
+      // Only reset if we were near the bottom (indicating user wants to follow new messages)
+      if (this.scrollContainerRef.value) {
+        const scrollTop = this.scrollContainerRef.value.scrollTop;
+        const scrollHeight = this.scrollContainerRef.value.scrollHeight;
+        const clientHeight = this.scrollContainerRef.value.clientHeight;
+        const isNearBottom = scrollTop + clientHeight >= scrollHeight - 50; // 50px tolerance
+        
+        if (isNearBottom) {
+          this._chatScrollPosition = 0; // Reset stored position to allow auto-scroll
+        }
+      }
+    }
 
     // Process new messages to find commit messages
     // Update last commit info via container status component
