@@ -3,13 +3,18 @@ import { initialState, initialMessages } from "../../../fixtures/dummy";
 import { AgentMessage, State } from "../../../types";
 
 // Mock state updates for SSE simulation
-let currentState = { ...initialState };
 const EMPTY_CONVERSATION =
   new URL(window.location.href).searchParams.get("emptyConversation") === "1";
 const ADD_NEW_MESSAGES =
   new URL(window.location.href).searchParams.get("addNewMessages") === "1";
 
 const messages = EMPTY_CONVERSATION ? [] : [...initialMessages];
+
+// Initialize state with correct message_count
+let currentState = { 
+  ...initialState, 
+  message_count: messages.length 
+};
 
 // Text encoder for SSE messages
 const encoder = new TextEncoder();

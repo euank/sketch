@@ -1408,6 +1408,7 @@ export class SketchAppShell extends LitElement {
                 .firstMessageIndex=${this.containerState?.first_message_index ||
                 0}
                 .state=${this.containerState}
+                .dataManager=${this.dataManager}
               ></sketch-timeline>
             </div>
           </div>

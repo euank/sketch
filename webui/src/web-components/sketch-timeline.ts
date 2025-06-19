@@ -51,6 +51,13 @@ export class SketchTimeline extends LitElement {
   @property({ attribute: false })
   state: State | null = null;
 
+  // Track initial load completion for better rendering control
+  @state()
+  private isInitialLoadComplete: boolean = false;
+
+  @property({ attribute: false })
+  dataManager: any = null; // Reference to DataManager for event listening
+
   // Viewport rendering properties
   @property({ attribute: false })
   initialMessageCount: number = 30;
@@ -71,20 +78,20 @@ export class SketchTimeline extends LitElement {
   private loadingTimeoutId: number | null = null;
 
   static styles = css`
-    /* Hide views initially to prevent flash of content */
-    .timeline-container .timeline,
-    .timeline-container .diff-view,
-    .timeline-container .chart-view,
-    .timeline-container .terminal-view {
-      visibility: hidden;
+    /* Hide message content initially to prevent flash of incomplete content */
+    .timeline-container:not(.view-initialized) sketch-timeline-message {
+      opacity: 0;
+      transition: opacity 0.2s ease-in;
     }
 
-    /* Will be set by JavaScript once we know which view to display */
-    .timeline-container.view-initialized .timeline,
-    .timeline-container.view-initialized .diff-view,
-    .timeline-container.view-initialized .chart-view,
-    .timeline-container.view-initialized .terminal-view {
-      visibility: visible;
+    /* Show content once initial load is complete */
+    .timeline-container.view-initialized sketch-timeline-message {
+      opacity: 1;
+    }
+
+    /* Always show loading indicators */
+    .timeline-container .loading-indicator {
+      opacity: 1;
     }
 
     .timeline-container {
@@ -96,6 +103,7 @@ export class SketchTimeline extends LitElement {
       box-sizing: border-box;
       overflow-x: hidden;
       flex: 1;
+      min-height: 100px; /* Ensure container has height for loading indicator */
     }
 
     /* Chat-like timeline styles */
@@ -693,6 +701,33 @@ export class SketchTimeline extends LitElement {
    * Called after the component's properties have been updated
    */
   updated(changedProperties: PropertyValues): void {
+    // Handle DataManager changes to set up event listeners
+    if (changedProperties.has("dataManager")) {
+      const oldDataManager = changedProperties.get("dataManager");
+      
+      // Remove old event listener if it exists
+      if (oldDataManager) {
+        oldDataManager.removeEventListener(
+          "initialLoadComplete",
+          this.handleInitialLoadComplete,
+        );
+      }
+      
+      // Add new event listener if dataManager is available
+      if (this.dataManager) {
+        this.dataManager.addEventListener(
+          "initialLoadComplete",
+          this.handleInitialLoadComplete,
+        );
+        
+        // Check if initial load is already complete
+        if (this.dataManager.getIsInitialLoadComplete && 
+            this.dataManager.getIsInitialLoadComplete()) {
+          this.isInitialLoadComplete = true;
+        }
+      }
+    }
+
     // Handle scroll container changes first to prevent race conditions
     if (changedProperties.has("scrollContainer")) {
       // Cancel any ongoing loading operations since container is changing
@@ -813,6 +848,15 @@ export class SketchTimeline extends LitElement {
   }
 
   /**
+   * Handle initial load completion from DataManager
+   */
+  private handleInitialLoadComplete = (eventData: { messageCount: number; expectedCount: number }): void => {
+    console.log(`Timeline: Initial load complete - ${eventData.messageCount}/${eventData.expectedCount} messages`);
+    this.isInitialLoadComplete = true;
+    this.requestUpdate();
+  };
+
+  /**
    * Set up observers for event-driven DOM monitoring
    */
   private setupObservers(): void {
@@ -833,6 +877,14 @@ export class SketchTimeline extends LitElement {
       "showCommitDiff",
       this._handleShowCommitDiff as EventListener,
     );
+
+    // Remove DataManager event listener if connected
+    if (this.dataManager) {
+      this.dataManager.removeEventListener(
+        "initialLoadComplete",
+        this.handleInitialLoadComplete,
+      );
+    }
 
     // Use our safe cleanup method
     this.removeScrollListener();
@@ -888,10 +940,23 @@ export class SketchTimeline extends LitElement {
     const isThinking =
       this.llmCalls > 0 || (this.toolCalls && this.toolCalls.length > 0);
 
+    // Apply view-initialized class when initial load is complete
+    const containerClass = this.isInitialLoadComplete 
+      ? "timeline-container view-initialized" 
+      : "timeline-container";
+
     return html`
       <div style="position: relative; height: 100%;">
         <div id="scroll-container">
-          <div class="timeline-container">
+          <div class="${containerClass}">
+            ${!this.isInitialLoadComplete
+              ? html`
+                  <div class="loading-indicator">
+                    <div class="loading-spinner"></div>
+                    <span>Loading conversation...</span>
+                  </div>
+                `
+              : ""}
             ${this.isLoadingOlderMessages
               ? html`
                   <div class="loading-indicator">
@@ -900,7 +965,7 @@ export class SketchTimeline extends LitElement {
                   </div>
                 `
               : ""}
-            ${repeat(
+            ${this.isInitialLoadComplete ? repeat(
               this.visibleMessages,
               this.messageKey,
               (message, index) => {
@@ -922,8 +987,8 @@ export class SketchTimeline extends LitElement {
                   .state=${this.state}
                 ></sketch-timeline-message>`;
               },
-            )}
-            ${isThinking
+            ) : ""}
+            ${isThinking && this.isInitialLoadComplete
               ? html`
                   <div class="thinking-indicator">
                     <div class="thinking-bubble">
