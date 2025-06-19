@@ -949,7 +949,7 @@ export class SketchTimeline extends LitElement {
       <div style="position: relative; height: 100%;">
         <div id="scroll-container">
           <div class="${containerClass}">
-            ${!this.isInitialLoadComplete
+            ${!this.isInitialLoadComplete && this.dataManager
               ? html`
                   <div class="loading-indicator">
                     <div class="loading-spinner"></div>
@@ -965,7 +965,7 @@ export class SketchTimeline extends LitElement {
                   </div>
                 `
               : ""}
-            ${this.isInitialLoadComplete ? repeat(
+            ${(this.isInitialLoadComplete || !this.dataManager) ? repeat(
               this.visibleMessages,
               this.messageKey,
               (message, index) => {
@@ -988,7 +988,7 @@ export class SketchTimeline extends LitElement {
                 ></sketch-timeline-message>`;
               },
             ) : ""}
-            ${isThinking && this.isInitialLoadComplete
+            ${isThinking && (this.isInitialLoadComplete || !this.dataManager)
               ? html`
                   <div class="thinking-indicator">
                     <div class="thinking-bubble">
