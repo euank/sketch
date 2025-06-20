@@ -117,13 +117,20 @@ func newConvoID() string {
 
 // New creates a new conversation with Claude with sensible defaults.
 // ctx is the context for the entire conversation.
-func New(ctx context.Context, srv llm.Service) *Convo {
+// If existingUsage is provided, it will be used as the starting usage instead of creating a new one.
+func New(ctx context.Context, srv llm.Service, existingUsage ...*CumulativeUsage) *Convo {
 	id := newConvoID()
+	var usage *CumulativeUsage
+	if len(existingUsage) > 0 && existingUsage[0] != nil {
+		usage = existingUsage[0]
+	} else {
+		usage = newUsage()
+	}
 	return &Convo{
 		Ctx:           skribe.ContextWithAttr(ctx, slog.String("convo_id", id)),
 		Service:       srv,
 		PromptCaching: true,
-		usage:         newUsage(),
+		usage:         usage,
 		Listener:      &NoopListener{},
 		ID:            id,
 		toolUseCancel: map[string]context.CancelCauseFunc{},
@@ -536,6 +543,24 @@ func newUsageWithSharedToolUses(parent *CumulativeUsage) *CumulativeUsage {
 	return &CumulativeUsage{ToolUses: parent.ToolUses, StartTime: time.Now()}
 }
 
+// PreserveUsageForNewConversation creates a new CumulativeUsage preserving data from existing usage
+func PreserveUsageForNewConversation(existing *CumulativeUsage) *CumulativeUsage {
+	if existing == nil {
+		return newUsage()
+	}
+	// Create a new usage that preserves all the accumulated data
+	return &CumulativeUsage{
+		StartTime:                existing.StartTime,
+		Responses:                existing.Responses,
+		InputTokens:              existing.InputTokens,
+		OutputTokens:             existing.OutputTokens,
+		CacheReadInputTokens:     existing.CacheReadInputTokens,
+		CacheCreationInputTokens: existing.CacheCreationInputTokens,
+		TotalCostUSD:             existing.TotalCostUSD,
+		ToolUses:                 maps.Clone(existing.ToolUses),
+	}
+}
+
 func (u *CumulativeUsage) Clone() CumulativeUsage {
 	v := *u
 	v.ToolUses = maps.Clone(u.ToolUses)
@@ -559,6 +584,16 @@ func (c *Convo) LastUsage() llm.Usage {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.lastUsage
+}
+
+// SetLastUsage sets the last usage (used when preserving usage across conversation resets)
+func (c *Convo) SetLastUsage(usage llm.Usage) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.lastUsage = usage
 }
 
 func (u *CumulativeUsage) WallTime() time.Duration {

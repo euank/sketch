@@ -807,3 +807,80 @@ func TestPushToOutbox(t *testing.T) {
 		t.Errorf("Expected Content to be %q, got %q", expected, received.Content)
 	}
 }
+
+// TestCompactConversationPreservesUsage tests that usage is preserved across conversation compaction
+func TestCompactConversationPreservesUsage(t *testing.T) {
+	// Create a test context
+	ctx := context.Background()
+
+	// Create a mock service
+	mockService := &MockLLMService{}
+
+	// Create a real conversation to test with
+	convo := conversation.New(ctx, mockService)
+
+	// Simulate some usage in the conversation
+	convo.SendMessage(llm.Message{
+		Role:    llm.MessageRoleUser,
+		Content: []llm.Content{{Type: llm.ContentTypeText, Text: "test message"}},
+	})
+
+	// Get the usage before compaction
+	usageBefore := convo.CumulativeUsage()
+	lastUsageBefore := convo.LastUsage()
+
+	// Verify we have some usage
+	if usageBefore.Responses == 0 {
+		t.Error("Expected some responses before compaction")
+	}
+
+	// Create a new conversation with preserved usage (simulating what happens in compaction)
+	preservedUsage := conversation.PreserveUsageForNewConversation(&usageBefore)
+	newConvo := conversation.New(ctx, mockService, preservedUsage)
+	newConvo.SetLastUsage(lastUsageBefore)
+
+	// Verify usage was preserved
+	usageAfter := newConvo.CumulativeUsage()
+	lastUsageAfter := newConvo.LastUsage()
+
+	if usageAfter.Responses != usageBefore.Responses {
+		t.Errorf("Expected %d responses after preservation, got %d", usageBefore.Responses, usageAfter.Responses)
+	}
+	if usageAfter.InputTokens != usageBefore.InputTokens {
+		t.Errorf("Expected %d input tokens after preservation, got %d", usageBefore.InputTokens, usageAfter.InputTokens)
+	}
+	if usageAfter.OutputTokens != usageBefore.OutputTokens {
+		t.Errorf("Expected %d output tokens after preservation, got %d", usageBefore.OutputTokens, usageAfter.OutputTokens)
+	}
+	if usageAfter.TotalCostUSD != usageBefore.TotalCostUSD {
+		t.Errorf("Expected $%.2f total cost after preservation, got $%.2f", usageBefore.TotalCostUSD, usageAfter.TotalCostUSD)
+	}
+
+	// Verify last usage was preserved
+	if lastUsageAfter.InputTokens != lastUsageBefore.InputTokens {
+		t.Errorf("Expected %d last usage input tokens after preservation, got %d", lastUsageBefore.InputTokens, lastUsageAfter.InputTokens)
+	}
+	if lastUsageAfter.OutputTokens != lastUsageBefore.OutputTokens {
+		t.Errorf("Expected %d last usage output tokens after preservation, got %d", lastUsageBefore.OutputTokens, lastUsageAfter.OutputTokens)
+	}
+	if lastUsageAfter.CostUSD != lastUsageBefore.CostUSD {
+		t.Errorf("Expected $%.2f last usage cost after preservation, got $%.2f", lastUsageBefore.CostUSD, lastUsageAfter.CostUSD)
+	}
+} // MockLLMService implements llm.Service for testing
+type MockLLMService struct{}
+
+func (m *MockLLMService) Do(ctx context.Context, req *llm.Request) (*llm.Response, error) {
+	return &llm.Response{
+		Content: []llm.Content{{Type: llm.ContentTypeText, Text: "mock response"}},
+		Usage: llm.Usage{
+			InputTokens:  100,
+			OutputTokens: 50,
+			CostUSD:      0.25,
+		},
+		StopReason: llm.StopReasonEndTurn,
+	}, nil
+}
+
+func (m *MockLLMService) TokenContextWindow() int {
+	return 200000
+}
