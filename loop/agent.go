@@ -622,9 +622,12 @@ func (a *Agent) CompactConversation(ctx context.Context) error {
 	contextWindow := a.config.Service.TokenContextWindow()
 	currentContextSize := lastUsage.InputTokens + lastUsage.CacheReadInputTokens + lastUsage.CacheCreationInputTokens
 
+	// Preserve cumulative usage across compaction
+	cumulativeUsage := a.convo.CumulativeUsage()
+
 	// Reset conversation state but keep all other state (git, working dir, etc.)
 	a.firstMessageIndex = len(a.history)
-	a.convo = a.initConvo()
+	a.convo = a.initConvoWithUsage(&cumulativeUsage)
 
 	a.mu.Unlock()
 
@@ -1205,8 +1208,13 @@ var agentSystemPrompt string
 // It must not be called until all agent fields are initialized,
 // particularly workingDir and git.
 func (a *Agent) initConvo() *conversation.Convo {
+	return a.initConvoWithUsage(nil)
+}
+
+// initConvoWithUsage initializes the conversation with optional preserved usage.
+func (a *Agent) initConvoWithUsage(usage *conversation.CumulativeUsage) *conversation.Convo {
 	ctx := a.config.Context
-	convo := conversation.New(ctx, a.config.Service, nil)
+	convo := conversation.New(ctx, a.config.Service, usage)
 	convo.PromptCaching = true
 	convo.Budget = a.config.Budget
 	convo.SystemPrompt = a.renderSystemPrompt()

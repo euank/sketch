@@ -30,7 +30,7 @@ func TestBasicConvo(t *testing.T) {
 		APIKey: apiKey,
 		HTTPC:  rr.Client(),
 	}
-	convo := New(ctx, srv)
+	convo := New(ctx, srv, nil)
 
 	const name = "Cornelius"
 	res, err := convo.SendUserTextMessage("Hi, my name is " + name)
@@ -92,7 +92,7 @@ func TestCancelToolUse(t *testing.T) {
 	srv := &ant.Service{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			convo := New(context.Background(), srv)
+			convo := New(context.Background(), srv, nil)
 
 			var cancelCalled bool
 			var cancelledWithErr error
@@ -248,7 +248,7 @@ func TestInsertMissingToolResults(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := &ant.Service{}
-			convo := New(context.Background(), srv)
+			convo := New(context.Background(), srv, nil)
 
 			// Create request with messages
 			req := &llm.Request{
