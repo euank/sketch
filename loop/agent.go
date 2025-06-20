@@ -1206,7 +1206,7 @@ var agentSystemPrompt string
 // particularly workingDir and git.
 func (a *Agent) initConvo() *conversation.Convo {
 	ctx := a.config.Context
-	convo := conversation.New(ctx, a.config.Service)
+	convo := conversation.New(ctx, a.config.Service, nil)
 	convo.PromptCaching = true
 	convo.Budget = a.config.Budget
 	convo.SystemPrompt = a.renderSystemPrompt()

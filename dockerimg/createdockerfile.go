@@ -165,7 +165,7 @@ func createDockerfile(ctx context.Context, srv llm.Service, initFiles map[string
 		return llm.TextContent("OK"), nil
 	}
 
-	convo := conversation.New(ctx, srv)
+	convo := conversation.New(ctx, srv, nil)
 
 	convo.Tools = []*llm.Tool{{
 		Name:        "dockerfile",

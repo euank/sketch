@@ -117,13 +117,16 @@ func newConvoID() string {
 
 // New creates a new conversation with Claude with sensible defaults.
 // ctx is the context for the entire conversation.
-func New(ctx context.Context, srv llm.Service) *Convo {
+func New(ctx context.Context, srv llm.Service, usage *CumulativeUsage) *Convo {
 	id := newConvoID()
+	if usage == nil {
+		usage = newUsage()
+	}
 	return &Convo{
 		Ctx:           skribe.ContextWithAttr(ctx, slog.String("convo_id", id)),
 		Service:       srv,
 		PromptCaching: true,
-		usage:         newUsage(),
+		usage:         usage,
 		Listener:      &NoopListener{},
 		ID:            id,
 		toolUseCancel: map[string]context.CancelCauseFunc{},
