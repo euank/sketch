@@ -32,11 +32,11 @@ sketch
 
 ## 🔧 Requirements
 
-Currently, Sketch runs on macOS and Linux. It uses Docker for containers.
+Currently, Sketch runs on MacOS and Linux. It uses Docker for containers.
 
 | Platform | Installation                                                               |
 | -------- | -------------------------------------------------------------------------- |
-| macOS    | `brew install colima` (or Docker Desktop/Orbstack)                         |
+| MacOS    | `brew install colima` (or Docker Desktop/Orbstack)                         |
 | Linux    | `apt install docker.io` (or equivalent for your distro)                    |
 | WSL2     | Install Docker Desktop for Windows (docker entirely inside WSL2 is tricky) |
 
