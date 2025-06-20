@@ -257,8 +257,18 @@ func executeBackgroundBash(ctx context.Context, req bashInput) (*BackgroundResul
 	stdoutFile := filepath.Join(tmpDir, "stdout")
 	stderrFile := filepath.Join(tmpDir, "stderr")
 
-	// Prepare the command
-	cmd := exec.Command("bash", "-c", req.Command)
+	// Prepare the command with timeout context
+	timeout := req.timeout()
+	cmdCtx := ctx
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		cmdCtx, cancel = context.WithTimeout(ctx, timeout)
+		// Don't defer cancel() here - let the timeout occur naturally
+		// The context will be cleaned up when the timeout goroutine finishes
+		_ = cancel // Keep reference to avoid unused variable warning
+	}
+
+	cmd := exec.CommandContext(cmdCtx, "bash", "-c", req.Command)
 	cmd.Dir = WorkingDir(ctx)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
@@ -294,47 +304,16 @@ func executeBackgroundBash(ctx context.Context, req bashInput) (*BackgroundResul
 		// Process has been reaped
 	}()
 
-	// Set up timeout handling if a timeout was specified
-	pid := cmd.Process.Pid
-	timeout := req.timeout()
+	// Start a goroutine to log timeout if it occurs
 	if timeout > 0 {
-		// Launch a goroutine that will kill the process after the timeout
-		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, timeout)
 		go func() {
-			defer timeoutCancel()
-			<-timeoutCtx.Done()
-
-			// Only proceed if we timed out (not if parent context was cancelled)
-			if timeoutCtx.Err() == context.DeadlineExceeded {
-				// Log to stderr that we are killing the process
-				msg := fmt.Sprintf("sketch: killing process %d after timeout of %v\n", pid, timeout)
-
-				// Write to the stderr file by opening it directly to avoid any closure issues
-				if stderrFile, err := os.OpenFile(stderrFile, os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+			<-cmdCtx.Done()
+			if cmdCtx.Err() == context.DeadlineExceeded {
+				msg := fmt.Sprintf("sketch: process %d killed after timeout of %v\n", cmd.Process.Pid, timeout)
+				if stderrFile, fileErr := os.OpenFile(stderrFile, os.O_WRONLY|os.O_APPEND, 0644); fileErr == nil {
 					stderrFile.WriteString(msg)
 					stderrFile.Sync()
 					stderrFile.Close()
-				}
-
-				slog.WarnContext(ctx, "killing background process after timeout", "pid", pid, "timeout", timeout)
-
-				// First try SIGTERM to allow graceful shutdown
-				killErr := syscall.Kill(-pid, syscall.SIGTERM)
-				if killErr != nil {
-					// If killing the process group fails, try to kill just the process
-					syscall.Kill(pid, syscall.SIGTERM)
-				}
-
-				// Give the process 5 seconds to shut down gracefully
-				graceCtx, graceCancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer graceCancel()
-				<-graceCtx.Done()
-
-				// If the process is still running, use SIGKILL
-				killErr = syscall.Kill(-pid, syscall.SIGKILL)
-				if killErr != nil {
-					// If killing the process group fails, try to kill just the process
-					syscall.Kill(pid, syscall.SIGKILL)
 				}
 			}
 		}()

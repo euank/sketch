@@ -3,6 +3,7 @@ package claudetool
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -376,6 +377,65 @@ func TestBackgroundBash(t *testing.T) {
 			t.Log("Process correctly running in background")
 			// Kill it for cleanup
 			process.Kill()
+		}
+
+		// Clean up
+		os.Remove(bgResult.StdoutFile)
+		os.Remove(bgResult.StderrFile)
+		os.Remove(filepath.Dir(bgResult.StdoutFile))
+	})
+}
+
+func TestBackgroundBashTimeout(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test")
+	}
+
+	// Test background command with timeout
+	t.Run("Background Command Timeout", func(t *testing.T) {
+		inputObj := struct {
+			Command    string `json:"command"`
+			Background bool   `json:"background"`
+			Timeout    string `json:"timeout"`
+		}{
+			Command:    "while true; do echo 'running'; sleep 1; done",
+			Background: true,
+			Timeout:    "2s",
+		}
+		inputJSON, err := json.Marshal(inputObj)
+		if err != nil {
+			t.Fatalf("Failed to marshal input: %v", err)
+		}
+
+		result, err := BashRun(context.Background(), inputJSON)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		// Parse the returned JSON
+		var bgResult BackgroundResult
+		resultStr := ContentToString(result)
+		if err := json.Unmarshal([]byte(resultStr), &bgResult); err != nil {
+			t.Fatalf("Failed to unmarshal background result: %v", err)
+		}
+
+		// Wait for timeout to occur (2s + buffer)
+		time.Sleep(3 * time.Second)
+
+		// Check that the process was terminated
+		if err := syscall.Kill(bgResult.PID, 0); err == nil {
+			t.Errorf("Process %d should have been terminated by timeout", bgResult.PID)
+		}
+
+		// Check that timeout message was written to stderr
+		stderrContent, err := os.ReadFile(bgResult.StderrFile)
+		if err != nil {
+			t.Fatalf("Failed to read stderr file: %v", err)
+		}
+
+		expectedMsg := fmt.Sprintf("sketch: process %d killed after timeout of 2s", bgResult.PID)
+		if !strings.Contains(string(stderrContent), expectedMsg) {
+			t.Errorf("Expected stderr to contain timeout message %q, got %q", expectedMsg, string(stderrContent))
 		}
 
 		// Clean up
