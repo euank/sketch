@@ -7,6 +7,11 @@ on:
         required: false
         type: string
         default: ""
+      working-directory:
+        description: "Working directory for the workflow"
+        required: false
+        type: string
+        default: "."
   push:
     branches-ignore:
       - "queue-main-*"
@@ -22,7 +27,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: "go.mod"
+          go-version-file: "${{ inputs.working-directory }}/go.mod"
           cache: true
 
       - name: Cache Go 1.24.4
@@ -35,7 +40,10 @@ jobs:
             ${{ runner.os }}-go1.24.4-
 
       - name: Optimize APT
-        run: ./.github/scripts/optimize-apt.sh
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          pwd
+          ./.github/scripts/optimize-apt.sh
 
       - name: Install tools
         run: |
@@ -46,7 +54,7 @@ jobs:
           # Empirically (by logging into runners with tmate), there are versions of Chromium/Chrome in /opt/google/chrome
           # and /usr/local/share/chromium/chrome-linux, and /usr/bin/chromium links to the former. Therefore, we
           # don't need to apt-get it separately.
-          
+
       # If you wish to do some interactive debugging, the following is handy. It will print
       # an SSH command that you can use to connect to the runner instance.
       - name: tmate debugging (disabled)
@@ -60,6 +68,7 @@ jobs:
           sleep 1800
 
       - name: Go generate
+        working-directory: ${{ inputs.working-directory }}
         run: |
           go generate ./...
           # if go generate created a diff
@@ -70,6 +79,7 @@ jobs:
           fi
 
       - name: Run tests
+        working-directory: ${{ inputs.working-directory }}
         run: |
           GOEXPERIMENT=synctest gotestsum --format testname -- ./...
           GOEXPERIMENT=synctest gotestsum --format testname -- -race ./...
