@@ -2,7 +2,6 @@ import { css, html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import "./sketch-monaco-view";
 import "./sketch-diff-range-picker";
-// import "./sketch-diff-file-picker"; // No longer needed for multi-file view
 import "./sketch-diff-empty-view";
 import {
   GitDiffFile,
@@ -233,9 +232,7 @@ export class SketchDiff2View extends LitElement {
       min-width: 400px; /* Ensure minimum width for range picker */
     }
 
-    sketch-diff-file-picker {
-      flex: 1;
-    }
+
 
     .view-toggle-button,
     .header-expand-button {
