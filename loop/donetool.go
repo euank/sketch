@@ -44,7 +44,6 @@ func makeDoneTool(codereview *codereview.CodeReviewer) *llm.Tool {
 const (
 	doneDescription         = `Use this tool when you have achieved the user's goal. The parameters form a checklist which you should evaluate.`
 	doneChecklistJSONSchema = `{
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Checklist",
   "description": "A schema for tracking checklist items with status and comments",
   "type": "object",
@@ -55,48 +54,123 @@ const (
       "description": "Collection of checklist items",
       "properties": {
         "checked_guidance": {
-          "$ref": "#/definitions/checklistItem",
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "description": "Current status of the checklist item",
+              "enum": ["yes", "no", "not applicable", "other"]
+            },
+            "description": {
+              "type": "string",
+              "description": "Description of what this checklist item verifies"
+            },
+            "comments": {
+              "type": "string",
+              "description": "Additional comments or context for this checklist item"
+            }
+          },
           "description": "I checked for and followed any directory-specific guidance files for all modified files."
         },
         "wrote_tests": {
-          "$ref": "#/definitions/checklistItem",
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "description": "Current status of the checklist item",
+              "enum": ["yes", "no", "not applicable", "other"]
+            },
+            "description": {
+              "type": "string",
+              "description": "Description of what this checklist item verifies"
+            },
+            "comments": {
+              "type": "string",
+              "description": "Additional comments or context for this checklist item"
+            }
+          },
           "description": "If code was changed, tests were written or updated."
         },
         "passes_tests": {
-          "$ref": "#/definitions/checklistItem",
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "description": "Current status of the checklist item",
+              "enum": ["yes", "no", "not applicable", "other"]
+            },
+            "description": {
+              "type": "string",
+              "description": "Description of what this checklist item verifies"
+            },
+            "comments": {
+              "type": "string",
+              "description": "Additional comments or context for this checklist item"
+            }
+          },
           "description": "If any commits were made, tests pass."
         },
         "code_reviewed": {
-          "$ref": "#/definitions/checklistItem",
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "description": "Current status of the checklist item",
+              "enum": ["yes", "no", "not applicable", "other"]
+            },
+            "description": {
+              "type": "string",
+              "description": "Description of what this checklist item verifies"
+            },
+            "comments": {
+              "type": "string",
+              "description": "Additional comments or context for this checklist item"
+            }
+          },
           "description": "If any commits were made, the codereview tool was run and its output was addressed."
         },
         "git_commit": {
-          "$ref": "#/definitions/checklistItem",
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "description": "Current status of the checklist item",
+              "enum": ["yes", "no", "not applicable", "other"]
+            },
+            "description": {
+              "type": "string",
+              "description": "Description of what this checklist item verifies"
+            },
+            "comments": {
+              "type": "string",
+              "description": "Additional comments or context for this checklist item"
+            }
+          },
           "description": "Create git commits for any code changes you made. A git hook will add Co-Authored-By and Change-ID trailers. The git user is already configured correctly."
         }
       },
       "additionalProperties": {
-        "$ref": "#/definitions/checklistItem"
-      }
-    }
-  },
-  "definitions": {
-    "checklistItem": {
-      "type": "object",
-      "required": ["status"],
-      "properties": {
-        "status": {
-          "type": "string",
-          "description": "Current status of the checklist item",
-          "enum": ["yes", "no", "not applicable", "other"]
-        },
-        "description": {
-          "type": "string",
-          "description": "Description of what this checklist item verifies"
-        },
-        "comments": {
-          "type": "string",
-          "description": "Additional comments or context for this checklist item"
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Current status of the checklist item",
+            "enum": ["yes", "no", "not applicable", "other"]
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of what this checklist item verifies"
+          },
+          "comments": {
+            "type": "string",
+            "description": "Additional comments or context for this checklist item"
+          }
         }
       }
     }
