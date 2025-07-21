@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
 # Use a content-based hash of the webui dir to avoid unnecessary rebuilds.

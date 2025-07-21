@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Pre-receive hook for sketch git http server
 # Handles refs/remotes/origin/Y pushes by forwarding them to origin/Y
 
